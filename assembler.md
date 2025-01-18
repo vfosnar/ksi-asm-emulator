@@ -1,5 +1,6 @@
-
-# Název úlohy
+Jak používat OF
+----
+# Základy práce s procesorem
 
 V předchozích úlohách jste se dozvěděli, jak funguje počítač (von neumanova koncepce) - procesor postupně čte a vykonává příkazy uložené (v dnešních implementacích) v bajtech. Cílem této úlohy bude si naprogramovat emulátor takového procesoru. <TODO: Procesoru/emulátoru??>
 
