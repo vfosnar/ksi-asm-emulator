@@ -2,6 +2,11 @@
 
 
 def parse_param(p: str) -> 'Parameter': # Part of assembler
+    """
+    ! Work in progress. Yet can't handle labels nor math (MOV [label + 2], 42)
+    ? Perhaps regex would be usefull??
+    pls help
+    """
     # Register
     if p in REGISTERS:
         return Register(p)
@@ -30,17 +35,14 @@ def parse_param(p: str) -> 'Parameter': # Part of assembler
             a.displacement = parse_number(p) # If is not ok, it's the users problem.
         
         return a
-
+    
+    # Pointer
     if "PTR" in p:
         p.replace("PTR", "", 1) # Hope not
         p.replace("FAR", "", 1)
         return Label(p, include_segment=True)
 
-    # Pointer
-    # TODO: Add
-
     raise Exception(f"Nebylo možné zpracovat parametr {p}")
-    ...
 
 def parse_number(s: str) -> int:
     if s[-1] == "h":
@@ -50,7 +52,7 @@ def parse_number(s: str) -> int:
     return int(s)
 
 
-def zpracuj_dalsi_instrukci(segment, IP): # Disassembler
+def parse_next_instruction(segment, IP): # Disassembler
     instruction = Instruction()
     span = 0
 
@@ -236,13 +238,13 @@ class ModRM:
         self.mod: int = byte // 64
         self.reg_val: int = (byte // 8) % 8
         self.rm_val: int = byte % 8
-        
-        self.reg: Register | None = None
-        self.rm: Memmory | Register | None = None
+
+        # self.reg: Register
+        self.rm: Memmory | Register = Register("Dummy")  # so that there couldn't be None - TODO: rewrite 
 
         # Reg
         regs = RM_8_REGS if is_8b else RM_16_REGS
-        self.reg = Register(regs[self.reg_val])
+        self.reg: Register = Register(regs[self.reg_val])
 
         # R/M
         if self.mod == 3:
@@ -291,26 +293,26 @@ ParameterOrLabel = Parameter | Label
 
 
 if __name__ == "__main__":
-    # x = zpracuj_dalsi_instrukci([
-    #     0x38, # CMP BL, DH
-    #     0xF3,
-    # ], 0)
+    x = parse_next_instruction([
+        0x38, # CMP BL, DH
+        0xF3,
+    ], 0)
     
-    # x = zpracuj_dalsi_instrukci([
-    #     0x80,
-    #     0xFB,
-    #     0x06,
-    # ], 0)
+    x = parse_next_instruction([
+        0x80,
+        0xFB,
+        0x06,
+    ], 0)
 
-    # x = zpracuj_dalsi_instrukci([
-    #     0xFE,
-    #     0xC0,
-    #     0x23,
-    #     0x01,
-    #     0x07,
-    # ], 0)
+    x = parse_next_instruction([
+        0xFE,
+        0xC0,
+        0x23,
+        0x01,
+        0x07,
+    ], 0)
 
-    x = zpracuj_dalsi_instrukci([
+    x = parse_next_instruction([
         0xF7,
         0xD8,
     ], 0)
@@ -332,17 +334,16 @@ ASSEMBLER
 - Zbýva prakticky vše
 Koncipované je to takto:
 1) Parsing parametrů
-2) Podle instrukce a parametrů vytvořit bajty
+2) Podle instrukce a parametrů vytvořit bytecode
 - problémy: assembler by měl zvládat základní matiku - např. MOV [n + 3], 4*5+1   --> MOV [(n+3)], 21
 
 
 DISASSEMBLER
-- ! Funkcionalita GPR
 - Zpracování pointerů
 
 
 EMULÁTOR
-- vymyslet ukládání informací (seznam segmentů / seznam všech bajtů programu)
+- vymyslet ukládání programu (seznam segmentů / seznam všech bajtů programu)
 - udělat vzorové řešení (dopsat předpřipravené funkce)
 - otestovat
 """
