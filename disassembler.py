@@ -72,6 +72,16 @@ def zpracuj_dalsi_instrukci(segment, IP): # Disassembler
 
     instruction.operation = operation
 
+    # Handle GRP instructions
+    if instruction.operation in GRPs:
+        instruction.modrm = ModRM(load_next(), properties[1] == "b", load_next)
+        
+        instruction.operation, sp_properties = GRPs[instruction.operation][instruction.modrm.reg_val]
+        if "1" in sp_properties:
+            # TODO: Research
+            raise Exception("Message from ORG: You've found easter egg (something i didn't want a solve). Please write to Diskusní fórum.")
+        
+        if sp_properties != "": properties = sp_properties
 
     for arg in properties.split():
         # Codes that don't need ModRM byte:  
@@ -127,7 +137,9 @@ MOD_00_RM = ["BX+SI","BX+DI","BP+SI","BP+DI", "SI", "DI", "BP", "BX"] # !! If mo
 
 REGISTERS = set(RM_8_REGS + RM_16_REGS + SEG_REGS)
 
+
 OPCODES = [
+    # Parsed from http://www.mlsite.net/8086/#tbl_map1
     # 0x0_
     ('ADD', 'Eb Gb'), ('ADD', 'Ev Gv'), ('ADD', 'Gb Eb'), ('ADD', 'Gv Ev'), ('ADD', 'AL Ib'), ('ADD', 'AX Iv'), ('PUSH', 'ES'), ('POP', 'ES'),
     ('OR', 'Eb Gb'), ('OR', 'Ev Gv'), ('OR', 'Gb Eb'), ('OR', 'Gv Ev'), ('OR', 'AL Ib'), ('OR', 'AX Iv'), ('PUSH', 'CS'), ('', ''),
@@ -193,6 +205,14 @@ OPCODES = [
     ('CLC', ''), ('STC', ''), ('CLI', ''), ('STI', ''), ('CLD', ''), ('STD', ''), ('GRP4', 'Eb'), ('GRP5', 'Ev'),
 ]
 
+GRPs = {
+    "GRP1": [('ADD', ''), ('OR', ''), ('ADC', ''), ('SBB', ''), ('AND', ''), ('SUB', ''), ('XOR', ''), ('CMP', '')],
+    "GRP2": [('ROL', ''), ('ROR', ''), ('RCL', ''), ('RCR', ''), ('SHL', ''), ('SHR', ''), ('--', ''), ('SAR', '')],
+    "GRP3a": [('TEST', 'Eb Ib'), ('--', ''), ('NOT', ''), ('NEG', ''), ('MUL', ''), ('IMUL', ''), ('DIV', ''), ('IDIV', '')],
+    "GRP3b": [('TEST', 'Ev Iv'), ('--', ''), ('NOT', ''), ('NEG', ''), ('MUL', ''), ('IMUL', ''), ('DIV', ''), ('IDIV', '')],
+    "GRP4": [('INC', ''), ('DEC', ''), ('--', ''), ('--', ''), ('--', ''), ('--', ''), ('--', ''), ('--', '')],
+    "GRP5": [('INC', ''), ('DEC', ''), ('CALL', ''), ('CALL', 'Mp'), ('JMP', ''), ('JMP', 'Mp'), ('PUSH', ''), ('--', '')]
+}
 
 class Instruction:
     def __init__(self):
@@ -206,16 +226,16 @@ class Instruction:
 
 class Register:
     def __init__(self, name):
-        self.name = name
-        self.size = 8 if name[1] in ['L', 'H'] else 16
+        self.name: str = name
+        self.size: int = 8 if name[1] in ['L', 'H'] else 16
 
 class ModRM:
     def __init__(self, byte, is_8b: bool, load_byte):
         self.byte = byte  # Asi k ničemu, ale třeba se to bude hodit TODO: Vymaž before release
 
-        self.mod = byte // 64
-        self.reg_val = (byte // 8) % 8
-        self.rm_val = byte % 8
+        self.mod: int = byte // 64
+        self.reg_val: int = (byte // 8) % 8
+        self.rm_val: int = byte % 8
         
         self.reg: Register | None = None
         self.rm: Memmory | Register | None = None
@@ -271,23 +291,28 @@ ParameterOrLabel = Parameter | Label
 
 
 if __name__ == "__main__":
-    x = zpracuj_dalsi_instrukci([
-        0x38, # CMP BL, DH
-        0xF3,
-    ], 0)
+    # x = zpracuj_dalsi_instrukci([
+    #     0x38, # CMP BL, DH
+    #     0xF3,
+    # ], 0)
     
-    x = zpracuj_dalsi_instrukci([
-        0x80,
-        0xFB,
-        0x06,
-    ], 0)
+    # x = zpracuj_dalsi_instrukci([
+    #     0x80,
+    #     0xFB,
+    #     0x06,
+    # ], 0)
+
+    # x = zpracuj_dalsi_instrukci([
+    #     0xFE,
+    #     0xC0,
+    #     0x23,
+    #     0x01,
+    #     0x07,
+    # ], 0)
 
     x = zpracuj_dalsi_instrukci([
-        0xFE,
-        0xC0,
-        0x23,
-        0x01,
-        0x07,
+        0xF7,
+        0xD8,
     ], 0)
 
     print(x)
