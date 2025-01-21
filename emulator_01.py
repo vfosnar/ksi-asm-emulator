@@ -11,6 +11,9 @@ class Byte:
         self.type = "data"
         self.value = 125
 
+# Flags
+Flag = int
+CF, PF, ZF, SF, OF = 0, 2, 6, 7, 11
 
 class Emulator:
 
@@ -48,20 +51,34 @@ class Emulator:
         # Předpokládám, že zde dostanu validní poskládaný kód
         ...
 
+    def set_flag(self, flag: Flag, val: bool):
+        f_reg = self.registers["FI"]
+        f_reg = f_reg & ~(1 << flag)  # Make the flag 0
+        
+        if val: 
+            f_reg = f_reg | (1 << flag)
+        
+    def get_flag(self, flag: Flag):
+        f_reg = self.registers["FI"]
+        return (f_reg // (2**flag)) % 2
 
-    def get_register(self, reg):
-        assert reg in REGISTERS
+    def get_register(self, reg: str):
+        reg = reg.upper()
+        assert reg in REGISTERS, f"There is no \"{reg}\" register in this emulator."
 
         if reg[1] == "X":
-            output = self.registers[reg[0]+"H"] << 8
-            output += self.registers[reg[0]+"L"]
+            output = self.get_register(reg[0]+"H") * 2**7
+            output += self.get_register(reg[0]+"L")            
             return output
         
-        return self.registers[reg]
+        output = self.registers[reg]
+        assert output is not None, f"Trying to get value of register {reg} with undefined value."        
+        return output
 
-    def load_register(self, reg: str, val: int):
+    def set_register(self, reg: str, val: int):
         if reg[1] == "X":
-            assert 0 < val < 2**16
+            assert 0 < val < 2**16, \
+                f"Snažíte se do registru {reg} vložit hodnotu {val}, která je mimo rozsah."
             self.registers[reg[0]+'L'] = val % 2**8
             self.registers[reg[0]+'H'] = val // 2**8
             return
@@ -73,9 +90,57 @@ class Emulator:
         assert True  # requested value is not None
         ...
 
-    def load_byte(self, segment, offset, span, value):
+    def set_byte(self, segment, offset, span, value):
         # Parametr span určuje, kolik bajtů se má uložit
         ...
+
+    # Autorský pomocná funkce
+    def get_value(self, arg):
+        # Asi autorská pomocná funkce. Ať si to kdyžtak udělají sami.
+        output = None
+
+        match arg:
+            case Immutable():
+                output = arg.value
+            case Memmory():
+                offset = arg.displacement
+                for reg in arg.source.split("+"):
+                    offset += self.get_register(reg)
+
+                output = self.get_byte(arg.segment, offset)
+            case Register():
+                output = self.get_register(arg.name)
+        
+        return output
+
+    # Autorský pomocná funkce
+    def set_value(self, arg, val):
+        match arg:
+            case Register():
+                self.set_register(arg.name, val)
+            case Memmory():
+                offset = arg.displacement
+                for reg in arg.source.split("+"):
+                    offset += self.get_register(reg)
+
+                # LENGTH!!??
+                self.set_byte(arg.segment, offset + i, ..., val)
+
+    def set_pf(self, result):
+        counter = 0
+        for _ in range(8):
+            counter += result % 2
+            result //= 2
+        
+        self.set_flag(PF, counter % 2 == 0)
+
+    def set_cf(self, result, opsize):
+        carry = result > 2**(8*opsize)
+        self.set_flag(CF, carry)
+    
+    def set_of(self, result, opsize):
+        ...
+
 
     def MOV(self, arg1, arg2):
         to_insert = 0  # Dummy value
@@ -98,17 +163,24 @@ class Emulator:
         # Then insert it where it belongs
         match arg1:
             case Register():
-                self.load_register(arg1.name, to_insert)
+                self.set_register(arg1.name, to_insert)
             case Memmory():
                 offset = arg2.displacement
                 for reg in arg2.source.split("+"):
                     offset += self.get_register(reg)
 
                 # LENGTH!!??
-                self.load_byte(arg2.segment, offset + i, ..., to_insert)
+                self.set_byte(arg2.segment, offset + i, ..., to_insert)
 
-    def ADD(self, instruction):
-        pass
+    def ADD(self, arg1, arg2):
+        vysledek = self.get_value(arg1)
+        vysledek += self.get_value(arg2)
+        # vysledek += self.get_flag(OF) % 2  # For ADC
+
+        # I need the operation size.
+        # self.set_value(arg1, vysledek % )
+
+        ...
 
     def ADC(self, instruction):
         pass
@@ -196,9 +268,14 @@ if __name__ == "__main__":
     i.operation = "MOV"
     i.arguments = [
         Register("AL"),
-        Immutable(45)
+        Register("DL"),
+        # Immutable(45)
     ]
 
     e = Emulator()
-    e.MOV(i)
+
+    e.registers["DL"] = 123
+    e.MOV(*i.arguments)
+    print(e.registers["AL"])
+
 

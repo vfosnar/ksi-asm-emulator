@@ -1,6 +1,7 @@
 
 
-def parse_next_instruction(segment, IP): # Disassembler
+def parse_next_instruction(segment, IP): 
+    """Just in time dissasembler"""
     instruction = Instruction()
     span = 0
 
@@ -25,11 +26,7 @@ def parse_next_instruction(segment, IP): # Disassembler
     # Handle GRP instructions
     if instruction.operation in GRPs:
         instruction.modrm = ModRM(load_next(), properties[1] == "b", load_next)
-        
         instruction.operation, sp_properties = GRPs[instruction.operation][instruction.modrm.reg_val]
-        if "1" in sp_properties:
-            # TODO: Research
-            raise Exception("Message from ORG: You've found easter egg (something i didn't want a solve). Please write to Diskusní fórum.")
         
         if sp_properties != "": properties = sp_properties
 
@@ -40,8 +37,13 @@ def parse_next_instruction(segment, IP): # Disassembler
             instruction.arguments.append(Register(arg))
             continue
 
+        if "1" in arg:
+            instruction.arguments.append(Immutable(1))
+        if "3" in arg:
+            instruction.arguments.append(Immutable(3))
+
         if arg[0] == "O":
-            byte += load_next() + load_next()* 2**8  # Little endian
+            byte += load_next() + load_next()* 2**8
             instruction.arguments.append(byte)
             continue
         
@@ -57,7 +59,7 @@ def parse_next_instruction(segment, IP): # Disassembler
             raise NotImplementedError("TODO: dodělat")
             continue
 
-        # From here, all instructions need ModR/M
+        # From here, all instructions do need ModR/M
         if instruction.modrm is None:
             instruction.modrm = ModRM(load_next(), arg[1] == "b", load_next)
 
@@ -77,49 +79,6 @@ def parse_next_instruction(segment, IP): # Disassembler
 
     return instruction
 
-
-def parse_param(p: str) -> 'Parameter': # Part of assembler
-    """
-    ! Work in progress. Yet can't handle labels nor math (MOV [label + 2], 42)
-    ? Perhaps regex would be usefull??
-    pls help
-    """
-    # Register
-    if p in REGISTERS:
-        return Register(p)
-
-    # Immutable
-    try:
-        print(parse_number(p))
-        return Immutable(parse_number(p))
-    except:
-        pass
-
-    # Memmory
-    if p[0] == '[' and p[-1] == "]":
-        p = p[1:-1]
-        a = Memmory(None, None)
-        for r in MOD_00_RM:
-            if r in p:
-                a.source = r
-                p = p.replace(r + '+', "+")
-                break
-        else:
-            raise Exception("Nebyl rozpoznán segment")
-        
-        if p[0] == "+":
-            p = p.replace('+', '')
-            a.displacement = parse_number(p) # If is not ok, it's the users problem.
-        
-        return a
-    
-    # Pointer
-    if "PTR" in p:
-        p.replace("PTR", "", 1) # Hope not
-        p.replace("FAR", "", 1)
-        return Label(p, include_segment=True)
-
-    raise Exception(f"Nebylo možné zpracovat parametr {p}")
 
 def parse_number(s: str) -> int:
     if s[-1] == "h":
@@ -221,6 +180,8 @@ class Instruction:
         self.operation: str = None
         self.prefix: None | str = None  # None | "DS" | "CS" | ...
         self.arguments: list[Parameter] = [] 
+
+        self.size = 0   # 0 for RET; 1 for MOV AL, AH; 2 for MOV AX, BX
 
         self.bytes = []  # Aspoň aby tu něco bylo 
         self.modrm: ModRM | None = None
