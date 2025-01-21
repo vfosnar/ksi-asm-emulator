@@ -44,7 +44,7 @@ class Emulator:
             "FI": 0
         }
 
-        self.program = []  # Seznam se segmenty
+        self.program = []  # Seznam bajtů
         self.running = True  # Může být uspáno pomocí instrukce HLT
 
     def run(self):
