@@ -31,6 +31,13 @@ def parse_next_instruction(program, IP):
         if sp_properties != "":
             properties = sp_properties
 
+    # Size of operation for better DevEx
+    instruction.size = 0
+    if "b" in properties:
+        instruction.size = 8
+    elif "w" in properties or "v" in properties:
+        instruction.size = 16
+
     for arg in properties.split():
         # Codes that don't need ModRM byte:
         # (Do not wory, it would read ModR/M. Codes are structured, so that this wouldn't happen)
@@ -40,8 +47,10 @@ def parse_next_instruction(program, IP):
 
         if "1" in arg:
             instruction.arguments.append(Immutable(1))
+            continue
         if "3" in arg:
             instruction.arguments.append(Immutable(3))
+            continue
 
         if arg[0] == "O":
             byte = load_next() + load_next() * 2**8
@@ -279,7 +288,7 @@ class Memmory:
         self.segment = segment
 
         # Is None when mod=00 and rm=110
-        self.source: str | None = source
+        self.source: str = source if source is not None else ""
 
 
 class Label:

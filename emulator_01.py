@@ -75,7 +75,7 @@ class Emulator:
         assert reg in REGISTERS, f"There is no \"{reg}\" register in this emulator."
 
         if reg[1] == "X":
-            output = self.get_register(reg[0]+"H") * 2**7
+            output = self.get_register(reg[0]+"H") * 2**8
             output += self.get_register(reg[0]+"L")
             return output
 
@@ -83,9 +83,18 @@ class Emulator:
         assert output is not None, f"Trying to get value of register {reg} with undefined value."
         return output
 
+    def get_address(self, arg: Memmory):
+        segment = self.get_register(arg.segment)
+        offset += arg.displacement
+
+        for reg in arg.source.split("+"):
+            offset += self.get_register(reg)
+
+        return segment + offset
+
     def set_register(self, reg: str, val: int):
         if reg[1] == "X":
-            assert 0 < val < 2**16, \
+            assert 0 <= val <= 2**16, \
                 f"Snažíte se do registru {reg} vložit hodnotu {val}, která je mimo rozsah."
             self.registers[reg[0]+'L'] = val % 2**8
             self.registers[reg[0]+'H'] = val // 2**8
@@ -95,15 +104,17 @@ class Emulator:
         self.registers[reg] = val
 
     def get_byte(self, segment, offset):
-        assert True  # requested value is not None
-        ...
+        val = self.program[segment + offset]
+        assert val is not None, f"Trying to get value of undefined byte at {segment + offset}."
+        return val
 
-    def set_byte(self, segment, offset, span, value):
-        # Parametr span určuje, kolik bajtů se má uložit
-        ...
+    def set_byte(self, segment, offset, value):
+        assert 0 <= value <= 2**8
+        seg = self.get_register(segment)
+        self.program[seg + offset] = value
 
     # Autorská pomocná funkce
-    def get_value(self, arg):
+    def get_value(self, arg: Parameter):
         # Asi autorská pomocná funkce. Ať si to kdyžtak udělají sami.
         output = None
 
@@ -122,25 +133,35 @@ class Emulator:
         return output
 
     # Autorská pomocná funkce
-    def set_value(self, arg, val):
+    def set_value(self, arg, val, size):
         match arg:
             case Register():
                 self.set_register(arg.name, val)
             case Memmory():
                 offset = arg.displacement
-                for reg in arg.source.split("+"):
-                    offset += self.get_register(reg)
 
-                # LENGTH!!??
-                self.set_byte(arg.segment, offset + i, ..., val)
+                if arg.source not in ["", None]:
+                    for reg in arg.source.split("+"):
+                        offset += self.get_register(reg)
+
+                for i in range(size // 8):
+                    self.set_byte(arg.segment, offset + i, val % 2**8)
+                    val //= 2**8
 
     def set_pf(self, result):
         counter = 0
-        for _ in range(8):
+        for _ in range(8):  # Kontroluje se dolní osmice
             counter += result % 2
             result //= 2
 
         self.set_flag(PF, counter % 2 == 0)
+
+    def set_zf(self, result):
+        self.set_flag(ZF, result == 0)
+
+    def set_sf(self, result, opsize):
+        sign = result // 2**(8*opsize - 1)
+        self.set_flag(SF, sign == 1)
 
     def set_cf(self, result, opsize):
         carry = result > 2**(8*opsize)
@@ -150,43 +171,17 @@ class Emulator:
 
         ...
 
-    def MOV(self, arg1, arg2):
-        to_insert = 0  # Dummy value
+    def MOV(self, instruction: Instruction):
+        assert len(instruction.arguments) == 2
+        arg1, arg2 = instruction.arguments
 
-        # First get the second value
-        match arg2:
-            case Immutable():
-                to_insert = arg2.value
-            case Memmory():
-                offset = arg2.displacement
-                for reg in arg2.source.split("+"):
-                    offset += self.get_register(reg)
-
-                to_insert = self.get_byte(arg2.segment, offset)
-            case Register():
-                to_insert = self.get_register(arg2.name)
-            case _:
-                raise Exception("Unsupported type of second argument in MOV")
-
-        # Then insert it where it belongs
-        match arg1:
-            case Register():
-                self.set_register(arg1.name, to_insert)
-            case Memmory():
-                offset = arg2.displacement
-                for reg in arg2.source.split("+"):
-                    offset += self.get_register(reg)
-
-                # LENGTH!!??
-                self.set_byte(arg2.segment, offset + i, ..., to_insert)
+        to_insert = self.get_value(arg2)
+        self.set_value(arg1, to_insert, instruction.size)
 
     def ADD(self, arg1, arg2):
         vysledek = self.get_value(arg1)
         vysledek += self.get_value(arg2)
         # vysledek += self.get_flag(OF) % 2  # For ADC
-
-        # I need the operation size.
-        # self.set_value(arg1, vysledek % )
 
         ...
 
@@ -218,28 +213,56 @@ class Emulator:
     # MUL, IMUL, DIV, IDIV - doufám, že ne
 
     def AND(self, instruction):
-        # AL & AH (pythonovksý operátor)
-        pass
+        val1 = self.get_value(instruction.arguments[0])
+        val2 = self.get_value(instruction.arguments[1])
+        result = val1 & val2
+
+        self.set_value(instruction.arguments[0], result, instruction.size)
+
+        self.set_sf(result, instruction.size)
+        self.set_zf(result)
+        self.set_pf(result)
 
     def OR(self, instruction):
-        # AL | AH (pythonovksý operátor)
-        pass
+        val1 = self.get_value(instruction.arguments[0])
+        val2 = self.get_value(instruction.arguments[1])
+        result = val1 | val2
+
+        self.set_value(instruction.arguments[0], result, instruction.size)
+
+        self.set_sf(result, instruction.size)
+        self.set_zf(result)
+        self.set_pf(result)
 
     def XOR(self, instruction):
-        # (p1 | p2) - (p1 & p2)
-        pass
+        val1 = self.get_value(instruction.arguments[0])
+        val2 = self.get_value(instruction.arguments[1])
+        result = val1 ^ val2
+
+        self.set_value(instruction.arguments[0], result, instruction.size)
+
+        self.set_sf(result, instruction.size)
+        self.set_zf(result)
+        self.set_pf(result)
 
     def NOT(self, instruction):
-        # (AL - 2^8) * -1
-        # (AX - 2^16) * -1
-        pass
+        val1 = self.get_value(instruction.arguments[0])
+        result = ~val1
+        self.set_value(instruction.arguments[0], result, instruction.size)
+        # Nemění příznaky
 
     def TEST(self, instruction):
         # And, akorát se neukládá. Jen nastavuje příznaky (flags)
-        pass
+        val1 = self.get_value(instruction.arguments[0])
+        val2 = self.get_value(instruction.arguments[1])
+        result = val1 & val2
+
+        self.set_sf(result, instruction.size)
+        self.set_zf(result)
+        self.set_pf(result)
 
     def NOP(self, instruction):
-        # Already implemented ;-)
+        # Already implemented for you ;-)
         pass
 
     # ROL, ROR, RCR, RCL - Rotate
@@ -270,16 +293,48 @@ class Emulator:
 
 
 if __name__ == "__main__":
-    i = Instruction()
-    i.operation = "MOV"
-    i.arguments = [
+
+    i1 = Instruction()
+    i1.operation = "MOV"
+    i1.arguments = [
         Register("AL"),
         Register("DL"),
         # Immutable(45)
     ]
 
     e = Emulator()
+    e.program = [None for _ in range(42)]
 
     e.registers["DL"] = 123
-    e.MOV(*i.arguments)
     print(e.registers["AL"])
+    e.MOV(i1)
+    print(e.registers["AL"])
+
+    e.registers["DS"] = 0
+
+    i2 = Instruction()
+    i2.operation = "MOV"
+    i2.size = 16
+    i2.arguments = [
+        Memmory(None, 0, "DS"),
+        Immutable(2735),
+    ]
+
+    print(e.program[0])
+    e.MOV(i2)
+    print(e.program[0])
+    print(e.program[1])
+
+    e.set_register("AX", 0b1111_1111_1111_1111)
+
+    print(e.get_register("AX"))
+
+    i3 = Instruction()
+    i3.operation = "AND"
+    i3.size = 16
+    i3.arguments = [
+        Register("AX"),
+        Immutable(0b11101),
+    ]
+    e.XOR(i3)
+    print(e.get_register("AX"))

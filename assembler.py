@@ -68,7 +68,7 @@ def parse_param(p: str) -> 'Parameter':  # Part of assembler
 
 
 def assemble(code: str) -> list[int]:
-    segments = {}
+    labels = {}
     byte_length = 0  # TODO: rename
 
     for i, line in enumerate(code.split("\n")):
@@ -79,28 +79,32 @@ def assemble(code: str) -> list[int]:
 
         if line.startswith("segment"):
             segment = line.split(" ")[1]
-            segments[segment] = i
+            labels[segment] = i
             continue
 
-        label, instr, args, comment = parse_parts(line)
+        label, instr, args = parse_line_parts(line)
 
         if instr not in INSTRUCTIONS:
             raise Exception(f"Unknown instruction {instr}")
 
+        if label != "":
+            labels[label] = byte_length
+
+        byte_length += get_bytes_length(instr, args)
+
+    # TODO: Continue
     ...
 
 
-def parse_parts(line: str) -> tuple[str, str, list[str], str]:
+def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     label, line = line.split(" ", 1)  # If no label, empty string
     instr, line = line.split(" ", 1)
-    comment = ""
-
-    if ";" in line:
-        line, comment = line.split(";", 1)
+    # regex to split by ';' but ignore semicolons within strings
+    line = re.split(r'(?<!".*);', line, 1)[0]
 
     args = [l.strip() for l in line.split(",")]
 
-    return label, instr, args, comment
+    return label, instr, args
 
 
 def get_bytes_length(instruction, args):
@@ -133,6 +137,37 @@ def get_bytes_length(instruction, args):
 
         ...
     ...
+
+
+def get_instruction_size(args: list[str]) -> int:
+    """Returns 0/8/16"""
+    if args == []:
+        return 0
+
+    size = None
+
+    for arg in args:
+        figured = None
+        if "byte " in arg.lower():
+            figured = 8
+        elif "word " in arg.lower():
+            figured = 16
+
+        elif arg in RM_8_REGS:
+            figured = 8
+        elif arg in RM_16_REGS or arg in SEG_REGS:
+            figured = 16
+
+        if size is None:
+            size = figured
+
+        if figured is not None and size != figured:
+            raise Exception("Incompatible sizes of arguments")
+
+    if size is None:
+        raise Exception("No size specified")
+
+    return size
 
 
 def matches_args(templates: list[str], args: list[str]):
