@@ -41,7 +41,7 @@ class Emulator:
             "SS": None,  # Stack segment
             "ES": None,  # Extra segment
 
-            "IP": None,  # Instruction pointer
+            "IP": 0,  # Instruction pointer
 
             # Flags (zde se ukládají informace ohledně operací) TODO: Líp vysvětlit
             "FI": 0
@@ -52,12 +52,16 @@ class Emulator:
 
     def run(self):
         while self.running:
-            instr = parse_next_instruction(self.program, self.registers["IP"])
+            instr, span = parse_next_instruction(
+                self.program, self.registers["IP"])
+            self.registers["IP"] += span
             match instr.operation:
                 case "ADD":
                     self.ADD(instr)
                 case "MOV":
                     self.MOV(instr)
+                case "HLT":
+                    self.HLT()
 
     def set_flag(self, flag: Flag, val: bool):
         f_reg = self.registers["FI"]
@@ -178,10 +182,17 @@ class Emulator:
         to_insert = self.get_value(arg2)
         self.set_value(arg1, to_insert, instruction.size)
 
-    def ADD(self, arg1, arg2):
-        vysledek = self.get_value(arg1)
-        vysledek += self.get_value(arg2)
-        # vysledek += self.get_flag(OF) % 2  # For ADC
+    def ADD(self, instruction):
+        vysledek = self.get_value(instruction.arguments[0])
+        vysledek += self.get_value(instruction.arguments[1])
+
+        self.set_value(instruction.arguments[0], vysledek, instruction.size)
+
+        self.set_sf(vysledek, instruction.size)
+        self.set_zf(vysledek)
+        self.set_pf(vysledek)
+        self.set_cf(vysledek, instruction.size)
+        # self.set_of(vysledek, instruction.size)
 
         ...
 
@@ -283,58 +294,64 @@ class Emulator:
     # INT, IRET
 
     def HLT(self):
-        """ 
-        Uspí procesor (pro účely této úlohy se používá pro 
-        ukončení programu - jinak by procesor porkačoval v načítání 
-        instrukcí).
-        * Už jsme ji pro Vás naprogramovali ;-)
-        """
+        # Už jsme ji pro Vás naprogramovali ;-)
         self.running = False
 
 
 if __name__ == "__main__":
 
-    i1 = Instruction()
-    i1.operation = "MOV"
-    i1.arguments = [
-        Register("AL"),
-        Register("DL"),
-        # Immutable(45)
-    ]
-
     e = Emulator()
-    e.program = [None for _ in range(42)]
+    e.program = [
+        0xB0, 0x07,  # MOV AL, 7
+        0xB4, 0x08,  # MOV AH, 8
+        0x00, 0xE0,  # ADD AL, AH
+        0xF4,  # HLT
+    ] + [None for _ in range(42)]
 
-    e.registers["DL"] = 123
-    print(e.registers["AL"])
-    e.MOV(i1)
-    print(e.registers["AL"])
+    e.run()
+    print(e.registers)
 
-    e.registers["DS"] = 0
+    # i1 = Instruction()
+    # i1.operation = "MOV"
+    # i1.arguments = [
+    #     Register("AL"),
+    #     Register("DL"),
+    #     # Immutable(45)
+    # ]
 
-    i2 = Instruction()
-    i2.operation = "MOV"
-    i2.size = 16
-    i2.arguments = [
-        Memmory(None, 0, "DS"),
-        Immutable(2735),
-    ]
+    # e = Emulator()
+    # e.program = [None for _ in range(42)]
 
-    print(e.program[0])
-    e.MOV(i2)
-    print(e.program[0])
-    print(e.program[1])
+    # e.registers["DL"] = 123
+    # print(e.registers["AL"])
+    # e.MOV(i1)
+    # print(e.registers["AL"])
 
-    e.set_register("AX", 0b1111_1111_1111_1111)
+    # e.registers["DS"] = 0
 
-    print(e.get_register("AX"))
+    # i2 = Instruction()
+    # i2.operation = "MOV"
+    # i2.size = 16
+    # i2.arguments = [
+    #     Memmory(None, 0, "DS"),
+    #     Immutable(2735),
+    # ]
 
-    i3 = Instruction()
-    i3.operation = "AND"
-    i3.size = 16
-    i3.arguments = [
-        Register("AX"),
-        Immutable(0b11101),
-    ]
-    e.XOR(i3)
-    print(e.get_register("AX"))
+    # print(e.program[0])
+    # e.MOV(i2)
+    # print(e.program[0])
+    # print(e.program[1])
+
+    # e.set_register("AX", 0b1111_1111_1111_1111)
+
+    # print(e.get_register("AX"))
+
+    # i3 = Instruction()
+    # i3.operation = "AND"
+    # i3.size = 16
+    # i3.arguments = [
+    #     Register("AX"),
+    #     Immutable(0b11101),
+    # ]
+    # e.XOR(i3)
+    # print(e.get_register("AX"))

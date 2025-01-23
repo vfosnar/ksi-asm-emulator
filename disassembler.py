@@ -1,6 +1,6 @@
 
 
-def parse_next_instruction(program, IP):
+def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
     """Just in time dissasembler"""
     instruction = Instruction()
     span = 0
@@ -88,7 +88,7 @@ def parse_next_instruction(program, IP):
             case _:
                 raise Exception("Unrecognised instruction property")
 
-    return instruction
+    return instruction, span
 
 
 def parse_number(s: str) -> int:

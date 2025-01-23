@@ -154,15 +154,3 @@ for example in examples:
 #     "GRP4": [('INC', ''), ('DEC', ''), ('--', ''), ('--', ''), ('--', ''), ('--', ''), ('--', ''), ('--', '')],
 #     "GRP5": [('INC', ''), ('DEC', ''), ('CALL', ''), ('CALL', 'Mp'), ('JMP', ''), ('JMP', 'Mp'), ('PUSH', ''), ('--', '')]
 # }
-
-
-# all_instructions = set()
-
-# for instr, _ in OPCODES:
-#     all_instructions.add(instr)
-
-# for grp in GRPs.values():
-#     for instr, _ in grp:
-#         all_instructions.add(instr)
-
-# print(all_instructions)
