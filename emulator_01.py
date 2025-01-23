@@ -1,5 +1,6 @@
 from disassembler import *
 
+
 class Byte:
     def __init__(self, type, value):
         self.type = "prefix"  # Prefix | instruction | data
@@ -11,9 +12,11 @@ class Byte:
         self.type = "data"
         self.value = 125
 
+
 # Flags
 Flag = int
 CF, PF, ZF, SF, OF = 0, 2, 6, 7, 11
+
 
 class Emulator:
 
@@ -48,16 +51,21 @@ class Emulator:
         self.running = True  # Může být uspáno pomocí instrukce HLT
 
     def run(self):
-        # Předpokládám, že zde dostanu validní poskládaný kód
-        ...
+        while self.running:
+            instr = parse_next_instruction(self.program, self.registers["IP"])
+            match instr.operation:
+                case "ADD":
+                    self.ADD(instr)
+                case "MOV":
+                    self.MOV(instr)
 
     def set_flag(self, flag: Flag, val: bool):
         f_reg = self.registers["FI"]
         f_reg = f_reg & ~(1 << flag)  # Make the flag 0
-        
-        if val: 
+
+        if val:
             f_reg = f_reg | (1 << flag)
-        
+
     def get_flag(self, flag: Flag):
         f_reg = self.registers["FI"]
         return (f_reg // (2**flag)) % 2
@@ -68,11 +76,11 @@ class Emulator:
 
         if reg[1] == "X":
             output = self.get_register(reg[0]+"H") * 2**7
-            output += self.get_register(reg[0]+"L")            
+            output += self.get_register(reg[0]+"L")
             return output
-        
+
         output = self.registers[reg]
-        assert output is not None, f"Trying to get value of register {reg} with undefined value."        
+        assert output is not None, f"Trying to get value of register {reg} with undefined value."
         return output
 
     def set_register(self, reg: str, val: int):
@@ -94,7 +102,7 @@ class Emulator:
         # Parametr span určuje, kolik bajtů se má uložit
         ...
 
-    # Autorský pomocná funkce
+    # Autorská pomocná funkce
     def get_value(self, arg):
         # Asi autorská pomocná funkce. Ať si to kdyžtak udělají sami.
         output = None
@@ -110,10 +118,10 @@ class Emulator:
                 output = self.get_byte(arg.segment, offset)
             case Register():
                 output = self.get_register(arg.name)
-        
+
         return output
 
-    # Autorský pomocná funkce
+    # Autorská pomocná funkce
     def set_value(self, arg, val):
         match arg:
             case Register():
@@ -131,16 +139,16 @@ class Emulator:
         for _ in range(8):
             counter += result % 2
             result //= 2
-        
+
         self.set_flag(PF, counter % 2 == 0)
 
     def set_cf(self, result, opsize):
         carry = result > 2**(8*opsize)
         self.set_flag(CF, carry)
-    
-    def set_of(self, result, opsize):
-        ...
 
+    def set_of(self, before: int, after: int, opsize: int):
+
+        ...
 
     def MOV(self, arg1, arg2):
         to_insert = 0  # Dummy value
@@ -159,7 +167,7 @@ class Emulator:
                 to_insert = self.get_register(arg2.name)
             case _:
                 raise Exception("Unsupported type of second argument in MOV")
-            
+
         # Then insert it where it belongs
         match arg1:
             case Register():
@@ -261,8 +269,6 @@ class Emulator:
         self.running = False
 
 
-
-
 if __name__ == "__main__":
     i = Instruction()
     i.operation = "MOV"
@@ -277,5 +283,3 @@ if __name__ == "__main__":
     e.registers["DL"] = 123
     e.MOV(*i.arguments)
     print(e.registers["AL"])
-
-
