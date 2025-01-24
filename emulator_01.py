@@ -164,6 +164,7 @@ class Emulator:
         self.set_flag(ZF, result == 0)
 
     def set_sf(self, result, opsize):
+        """Sets the sign flag."""
         sign = result // 2**(8*opsize - 1)
         self.set_flag(SF, sign == 1)
 
@@ -183,16 +184,17 @@ class Emulator:
         self.set_value(arg1, to_insert, instruction.size)
 
     def ADD(self, instruction):
+        # TODO: Dodělat znaménkové přetečení
         vysledek = self.get_value(instruction.arguments[0])
         vysledek += self.get_value(instruction.arguments[1])
+        self.set_cf(vysledek, instruction.size)
+        vysledek %= 2**(8*instruction.size)
 
         self.set_value(instruction.arguments[0], vysledek, instruction.size)
 
         self.set_sf(vysledek, instruction.size)
         self.set_zf(vysledek)
         self.set_pf(vysledek)
-        self.set_cf(vysledek, instruction.size)
-        # self.set_of(vysledek, instruction.size)
 
         ...
 
@@ -206,10 +208,20 @@ class Emulator:
         pass
 
     def INC(self, instruction):
-        pass
+        val = self.get_value(instruction.arguments[0]) + 1
+        val %= 2**(8*instruction.size)
+        self.set_value(instruction.arguments[0], val, instruction.size)
+
+        self.set_sf(val, instruction.size)
+        self.set_zf(val)
+        self.set_pf(val)
+        self.set_flag(OF, val == 0)  # TODO: Tohle se mi nějak nezdá
 
     def DEC(self, instruction):
         pass
+
+    def NEG(self, instruction):
+        val = self.get_value(instruction.arguments[0])
 
     def CMP(self, instruction):
         pass
