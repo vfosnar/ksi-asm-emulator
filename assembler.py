@@ -230,6 +230,11 @@ def matches_args(templates: list[str], args: list[str]):
                 return False
             continue
 
+        if templ in REGISTERS:
+            if arg != templ:
+                return False 
+            continue
+
         # TODO: Tohle vypadá tak strašně. Acho jo. Musím to přepsat
         if arg in SEG_REGS:
             if templ not in SEG_REGS or templ[0] != "S":
@@ -461,16 +466,17 @@ segment extra_segment
 
     code3 = """
 segment code
-        dec byte [bx+2]
-        MOV BX, 42
+        MOV AH, 7
 
 
 """
 
+    print(matches_args(["AL"], ["AH"]))
+
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
     program = assemble(code3)
-    print(program)
+    print([hex(b) for b in program if b is not None])
 
     # assemble("segment code \nllaabel JMP lbl_02")
 

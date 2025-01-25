@@ -1,5 +1,5 @@
 from disassembler import *
-
+from assembler import * # TODO: Tohle samozřejmě přepsat na jenom funkci assemble()
 
 class Byte:
     def __init__(self, type, value):
@@ -311,17 +311,33 @@ class Emulator:
 
 
 if __name__ == "__main__":
+    code = """
+segment code
+    MOV AL, 7
+    MOV AH, 8
+    ADD AX, 8
+    HLT
+"""
+    program = assemble(code)
+    print([hex(b) for b in program if b is not None])
 
     e = Emulator()
-    e.program = [
-        0xB0, 0x07,  # MOV AL, 7
-        0xB4, 0x08,  # MOV AH, 8
-        0x00, 0xE0,  # ADD AL, AH
-        0xF4,  # HLT
-    ] + [None for _ in range(42)]
-
+    e.program = program
     e.run()
     print(e.registers)
+    
+    # e = Emulator()
+    # e.program = [
+    #     0xB0, 0x07,  # MOV AL, 7
+    #     0xB4, 0x08,  # MOV AH, 8
+    #     0x00, 0xE0,  # ADD AL, AH
+    #     0xF4,  # HLT
+    # ] + [None for _ in range(42)]
+
+    # e.run()
+    # print(e.registers)
+
+    # ====================== starý kód
 
     # i1 = Instruction()
     # i1.operation = "MOV"

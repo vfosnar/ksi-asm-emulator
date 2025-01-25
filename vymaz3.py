@@ -66,11 +66,11 @@ def calculate_expected_length(params: str) -> int:
 # # print(wiht_0)
 
 
-import re
+# import re
 
 
 
-# Example usage
-assembly_string = "MOV ax, bx\nMOV labelbx, [clo+2]"
-result = capitalize_registers(assembly_string)
-print(result)
+# # Example usage
+# assembly_string = "MOV ax, bx\nMOV labelbx, [clo+2]"
+# result = capitalize_registers(assembly_string)
+# print(result)
