@@ -42,25 +42,35 @@ def calculate_expected_length(params: str) -> int:
 
 
 # Get name of all instructions, that take no argument (param == "")
-i = 0
-for name, instructions in INSTRUCTIONS_v2.items():
-    for params, info in instructions:
-        # i += 1
-        # print(i)
-        if params == "":
-            print(name)
-            # break
+# i = 0
+# for name, instructions in INSTRUCTIONS_v2.items():
+#     for params, info in instructions:
+#         # i += 1
+#         # print(i)
+#         if params == "":
+#             # print(name)
+#             # break
 
 
-print(len(INSTRUCTIONS_WITHOUT_PARAMETER))
+# # print(len(INSTRUCTIONS_WITHOUT_PARAMETER))
 
 
 
-wiht_0 = set()
-for name, instructions in INSTRUCTIONS_v2.items():
-    if "0" in name and name[:-1] not in INSTRUCTIONS_WITHOUT_PARAMETER:
-        print("----", name)
-        wiht_0.add(name)
+# wiht_0 = set()
+# for name, instructions in INSTRUCTIONS_v2.items():
+#     if "0" in name and name[:-1] not in INSTRUCTIONS_WITHOUT_PARAMETER:
+#         # print("----", name)
+#         wiht_0.add(name)
 
-print(INSTRUCTIONS_WITHOUT_PARAMETER - wiht_0)
-print(wiht_0)
+# # print(INSTRUCTIONS_WITHOUT_PARAMETER - wiht_0)
+# # print(wiht_0)
+
+
+import re
+
+
+
+# Example usage
+assembly_string = "MOV ax, bx\nMOV labelbx, [clo+2]"
+result = capitalize_registers(assembly_string)
+print(result)

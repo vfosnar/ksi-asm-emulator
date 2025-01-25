@@ -146,10 +146,11 @@ def assemble(code: str) -> list[int]:
 
 
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
+    line = capitalize_registers(line)
+
     label, line = line.split(" ", 1)  # If no label, empty string
     instr, line = split_on(line, " ")
-    # regex to split by ';' but ignore semicolons within strings
-    # line = re.split(r'(?<!");', line, 1)[0]
+    instr = instr.upper()
     line, _ = split_on(line, ";")
 
     args = [l.strip() for l in line.split(",")]
@@ -158,6 +159,10 @@ def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
 
 def split_on(line: str, char: str) -> tuple[str, str]:
     return line.split(char, 1) if char in line else (line, "")
+
+def capitalize_registers(assembly_code):
+    pattern = r'\b(' + '|'.join(LOWERCASE_REGISTERS) + r')\b'
+    return re.sub(pattern, lambda m: m.group(0).upper(), assembly_code)
 
 # print(parse_line_parts(" HLT"))
 
@@ -346,7 +351,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                     size = 0
                     if displ != 0:
                         size = 8 if displ < 2**8 else 16
-                        info["data"].extend(displ, size)
+                        info["data"].extend(int_to_bytes(displ, size))
                         mod_val = size // 8
 
                 else:
@@ -367,7 +372,8 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                 # ? Snad je to správně
 
     if "E" in "".join(parameters):
-        to_fill = info["expected_length"] - 1 - (1 if "prefix" in info else 0) - (1 if "modrm" in info else 0)
+        to_fill = info["expected_length"] - len(info["data"]) - (1 if "prefix" in info else 0) - (1 if "modrm" in info else 0)
+        to_fill -= 1 # TODO: Ověř si, že to tak doopravdy má být
         info["data"].extend([0x90] * to_fill)
     # 1) Register / Memmory (=> ModR/M + možný displacement - taky podle toho upravid Mod) 
     # 2) Ap (pointer) -> uložit segment a offset
@@ -394,7 +400,7 @@ def calculate_value(arg: str, labels: dict[str, int]) -> int:
     for part in parts:
         if part == "":
             continue
-        
+
         sign = "-" if part[0] == "-" else "+"
         part = part.replace(sign, "")
         part = part.strip()
@@ -429,7 +435,7 @@ if __name__ == "__main__":
     # print(calculate_value("lbl+42", {"lbl": 42}))
     # print(calculate_value("lbl-42", {"lbl": 42}))
     # print(calculate_value("lbl- 42 + NoTomeUndefined", {"lbl": 42}))
-    print(matches_args(["3"], ["3"]))
+    # print(matches_args(["3"], ["3"]))
     code = """
 segment code
 label   MOV AX, 7
@@ -441,12 +447,29 @@ label   MOV AX, 7
 
     code2 = """
 segment code
-label   DEC byte [BX]
+        dec byte [bx+2]
+label   DEC byte [BX+2]
+        MOV AX, label
+
+segment extra_segment
+        MOV AX, 42
+        MOV BX, 42
+        ADD AX, BX
+        INC AX
+        
+"""
+
+    code3 = """
+segment code
+        dec byte [bx+2]
+        MOV BX, 42
+
+
 """
 
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
-    program = assemble(code2)
+    program = assemble(code3)
     print(program)
 
     # assemble("segment code \nllaabel JMP lbl_02")

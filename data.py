@@ -15,7 +15,7 @@ SEG_REGS = ["ES", "CS", "SS", "DS", "FS", "GS"]
 MOD_00_RM = ["BX+SI", "BX+DI", "BP+SI", "BP+DI", "SI", "DI", "BP", "BX"]
 
 REGISTERS = set(RM_8_REGS + RM_16_REGS + SEG_REGS)
-
+LOWERCASE_REGISTERS = [reg.lower() for reg in REGISTERS]
 
 OPCODES = [
     # Parsed from http://www.mlsite.net/8086/#tbl_map1
