@@ -129,6 +129,9 @@ INSTRUCTIONS_WITHOUT_PARAMETER = {"DAA", "DAS","AAA","AAS","NOP","CBW","CWD","WA
                                   "CMPSB","CMPSW","STOSB","STOSW","LODSB","LODSW","SCASB","SCASW","RET","RETF","INTO","IRET","XLAT",
                                   "LOCK","REPNZ","REPZ","HLT","CMC","CLC","STC","CLI","STI","CLD","STD"}
 
+DATA_INSTRUCTIONS = {"DB", "DW", "DD", "RESB", "RESW", "RESD"}
+
+
 INSTRUCTIONS_v2 = {
     "ADD8": [
         ("Eb Gb", {"opcode": 0, "expected_length": 4}),

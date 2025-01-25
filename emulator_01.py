@@ -60,8 +60,13 @@ class Emulator:
                     self.ADD(instr)
                 case "MOV":
                     self.MOV(instr)
+
+                case "NOP":
+                    self.NOP(instr)
                 case "HLT":
                     self.HLT()
+                case unknown:
+                    raise Exception(f"This emulator doesn't support this operation: {unknown}")
 
     def set_flag(self, flag: Flag, val: bool):
         f_reg = self.registers["FI"]
@@ -104,7 +109,11 @@ class Emulator:
             self.registers[reg[0]+'H'] = val // 2**8
             return
 
-        assert 0 < val < 2**8
+        if reg[1] in ["L", "H"]:
+            assert 0 < val < 2**8
+        else:
+            assert 0 < val < 2**16
+
         self.registers[reg] = val
 
     def get_byte(self, segment, offset):
@@ -321,18 +330,33 @@ segment code
 """
     code2 = """
 segment code
+        MOV BX, data
+        MOV DS, BX
         MOV AH, [0]
         ADD AH, 8+8
         MOV [0], AH
         hlt
+segment data
+n       db 42
 """
 
-    program = assemble(code2)
+    code3 = """
+segment code
+        MOV BX, data
+        MOV DS, BX
+
+segment data
+n       db 42
+x       resb 4
+y       db 0ABh
+"""
+
+    program = assemble(code3)
     print([hex(b) for b in program if b is not None])
 
     e = Emulator()
     e.program = program
-    e.registers["DS"] = 0  # For debugging purposes
+    # e.registers["DS"] = 0  # For debugging purposes
     e.run()
     print(e.registers)
     print([hex(b) for b in e.program if b is not None])

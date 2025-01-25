@@ -19,29 +19,47 @@ def assemble(code: str) -> list[int]:
 
         if line.startswith("segment"):
             segment = line.split(" ")[1]
-            labels[segment] = i
+            labels[segment] = byte_length
             segments_templates.append([])
             continue
 
         label, instr, args = parse_line_parts(line)
 
-        size = get_instruction_size(instr, args)
-
         if label != "":
             labels[label] = byte_length
 
-        if instr+str(size) not in INSTRUCTIONS_v2:
-            raise Exception(f"Unknown instruction {instr}")
+        if instr in DATA_INSTRUCTIONS:
+            match instr[-1]:
+                case "B":
+                    size = 8
+                case "W":
+                    size = 16
+                case "D":
+                    size = 32
 
-        possible_codes = INSTRUCTIONS_v2[instr+str(size)]
+            if instr[0] == "D":
+                expected_length = len(args) * (size // 8) 
+            elif "RES" in instr:
+                expected_length = calculate_value(args[0], {}) * (size // 8) # Tady snad nikdo nebude dávat návěští. Hlavně delku potřebuju vědět už tu.
+                
+            info = {"expected_length": expected_length, 
+                    "size": size, # This is so cursed (ale nestíhám, takže to budeš muset přežít)
+                    "instruction": instr
+            }
+            segments_templates[-1].append(("skip", args, info))  # Code duplicity
 
-        for instr_params, info in possible_codes:
-            if matches_args(instr_params.split(" "), args):
-                info = info.copy()
-                segments_templates[-1].append((instr_params, args, info))
-                break
         else:
-            raise Exception(f"Invalid arguments for instruction {instr}")
+            size = get_instruction_size(instr, args)
+            if instr+str(size) not in INSTRUCTIONS_v2:
+                raise Exception(f"Unknown instruction {instr}")
+            possible_codes = INSTRUCTIONS_v2[instr+str(size)]
+            for instr_params, info in possible_codes:
+                if matches_args(instr_params.split(" "), args):
+                    info = info.copy()
+                    segments_templates[-1].append((instr_params, args, info))  # Code duplicity
+                    break
+            else:
+                raise Exception(f"Invalid arguments for instruction {instr}")
 
         byte_length += info["expected_length"]
 
@@ -90,7 +108,7 @@ def capitalize_registers(assembly_code):
 
 def get_instruction_size(instruction: str, args: list[str]) -> int:
     """Returns 0/8/16"""
-    if instruction in INSTRUCTIONS_WITHOUT_PARAMETER:
+    if instruction in INSTRUCTIONS_WITHOUT_PARAMETER or instruction in DATA_INSTRUCTIONS:
         return 0
     
     if instruction == "INT": # Hnusný hardcode, ale zjistil jsem to pozdě
@@ -159,7 +177,7 @@ def matches_args(templates: list[str], args: list[str]):
 
         # TODO: Tohle vypadá tak strašně. Acho jo. Musím to přepsat
         if arg in SEG_REGS:
-            if templ not in SEG_REGS or templ[0] != "S":
+            if templ not in SEG_REGS and templ[0] != "S":
                 return False
             continue
 
@@ -191,6 +209,17 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
     """Converts instruction to bytecode."""
     # ! NOT TESTED !
     output = []
+
+    if "opcode" not in info: 
+        # Is a DATA instruction (Like DB or RESB)
+        if info["instruction"][0] == "D": # DB, DW, DD
+            for arg in args:
+                val = calculate_value(arg, labels)
+                output.extend(int_to_bytes(val, info["size"]))
+        elif info["instruction"][0] == "R":  # RESB, RESW, RESD
+            output.extend([None] * info["expected_length"])
+            
+        return output
 
     # --- 1) Vyplnit celé info
     info["data"] = []
@@ -242,13 +271,13 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                 else:
                     reg_val = RM_16_REGS.index(arg) 
 
-                if "modrm" not in info:
+                if "modrm" not in info: # Code triplicity
                     info["modrm"] = 0
 
                 info["modrm"] += reg_val *8  # Reg part of modrm
 
             case "E":
-                if "modrm" not in info: # Code duplicity
+                if "modrm" not in info: # Code triplicity
                     info["modrm"] = 0
 
                 rm_val, mod_val = 0, 0
@@ -289,6 +318,8 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                 
             case "S":
                 # Segment register
+                if "modrm" not in info: # Code triplicity
+                    info["modrm"] = 0
                 reg_val = SEG_REGS.index(arg)
                 info["modrm"] += reg_val * 8
                 # ? Snad je to správně
@@ -385,10 +416,11 @@ if __name__ == "__main__":
     # print(calculate_value("lbl-42", {"lbl": 42}))
     # print(calculate_value("lbl- 42 + NoTomeUndefined", {"lbl": 42}))
     # print(matches_args(["3"], ["3"]))
-    print(matches_args(["Eb", "Gb"], ["AL", "[32]"]))
-    print(calculate_value("42+23-lbl", {"lbl": 42}))
-    print(calculate_value("", {"lbl": 42}))
-    
+    # print(matches_args(["Eb", "Gb"], ["AL", "[32]"]))
+    # print(calculate_value("42+23-lbl", {"lbl": 42}))
+    # print(calculate_value("", {"lbl": 42}))
+    # print(matches_args(["AL"], ["AH"]))
+    print(matches_args(["Sw", "Ew"], ["DS", "BX"]))
 
 
     code = """
@@ -416,17 +448,32 @@ segment extra_segment
 
     code3 = """
 segment code
-        MOV AH, [0]
-
-
+        MOV DS, BX
 """
 
-    print(matches_args(["AL"], ["AH"]))
+    code4 = """
+segment data
+n        DB 42, n, navesti
+navesti dd 42, n
+"""
+
+    code5 = """
+segment code
+        MOV BX, data
+        MOV DS, BX
+
+segment data
+n       db 42
+x       resb 4
+y       db 0ABh
+"""
+
 
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
-    program = assemble(code3)
-    print([bin(b) for b in program if b is not None])
+    program = assemble(code5)
+    print(program)
+    # print([hex(b) for b in program if b is not None])
 
     # assemble("segment code \nllaabel JMP lbl_02")
 
