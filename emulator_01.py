@@ -344,15 +344,20 @@ n       db 42
 segment code
         MOV BX, data
         MOV DS, BX
+        MOV BX, n
+        MOV AL, [BX]
+        nop             ; V AL by mělo být 42 
+        HLT
 
 segment data
 n       db 42
 x       resb 4
 y       db 0ABh
+
 """
 
     program = assemble(code3)
-    print([hex(b) for b in program if b is not None])
+    print(program)
 
     e = Emulator()
     e.program = program

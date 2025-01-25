@@ -6,7 +6,8 @@ import re
 
 def assemble(code: str) -> list[int]:
     labels = {}
-    byte_length = 0  # TODO: rename
+    segment_length = 0
+    total_length = 0  # TODO: rename
 
     templates = []
     segments_templates = []
@@ -18,15 +19,20 @@ def assemble(code: str) -> list[int]:
             continue
 
         if line.startswith("segment"):
+            if segment_length != 0:
+                total_length += bytes_remaining_in_segment(segment_length)
+        
             segment = line.split(" ")[1]
-            labels[segment] = byte_length
+            segment_length = 0
+            labels[segment] = total_length
             segments_templates.append([])
+
             continue
 
         label, instr, args = parse_line_parts(line)
 
         if label != "":
-            labels[label] = byte_length
+            labels[label] = segment_length
 
         if instr in DATA_INSTRUCTIONS:
             match instr[-1]:
@@ -61,7 +67,8 @@ def assemble(code: str) -> list[int]:
             else:
                 raise Exception(f"Invalid arguments for instruction {instr}")
 
-        byte_length += info["expected_length"]
+        segment_length += info["expected_length"]
+        total_length += info["expected_length"]
 
     bytecode = []
 
@@ -78,11 +85,15 @@ def assemble(code: str) -> list[int]:
         
 
         # TODO: Doplnit None do nějakého násobku 2 nebo tak??
-        segment_bytecode.extend([None for _ in range(42)])
+        segment_bytecode.extend([None for _ in range(bytes_remaining_in_segment(len(segment_bytecode)))])
         bytecode.extend(segment_bytecode)
 
     return bytecode
 
+
+def bytes_remaining_in_segment(segment_length: int) -> int:
+    # TODO: Write something meaningfull
+    return 42  # Even tho 42 is an answer to everything, it is not for this.  
 
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     line = capitalize_registers(line)
@@ -461,6 +472,7 @@ navesti dd 42, n
 segment code
         MOV BX, data
         MOV DS, BX
+        MOV [n], byte 042
 
 segment data
 n       db 42
