@@ -318,7 +318,12 @@ segment code
     ADD AX, 8
     HLT
 """
-    program = assemble(code)
+    code2 = """
+segment code
+        MOV AH, [0]
+"""
+
+    program = assemble(code2)
     print([hex(b) for b in program if b is not None])
 
     e = Emulator()

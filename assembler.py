@@ -3,84 +3,6 @@ from disassembler import *
 import re
 
 
-def get_byteslength(instruction, args):
-    # 3 možnosti:
-    # - Immutable
-    # - Register
-    # - Memmory
-    #
-    # Size:
-    # byte/word/(none)
-    #
-    # Taky potřebuju vědět:
-    # Který opcode
-
-    output = Instruction()
-
-    output.operation = "MOV"  # - TODO: extract from line
-    output.size = 2  # Vyčíst z idk
-
-    ...
-
-
-def deprecated__parse_param(par: str) -> 'Parameter':  # Part of assembler
-    """
-    ! Work in progress. Yet can't handle labels nor math např.: [label + 2]
-    ? Perhaps regex would be usefull??
-    pls help
-    """
-    # Register
-    if par in REGISTERS:
-        return Register(par)
-    
-    if "\"" in par or "'" in par:
-        raise Exception("Strings are not supported")
-
-
-    if "FAR" in par:
-        # TODO: Handle 
-        ... 
-
-    try:# Immutable    
-        return Immutable(parse_number(par))
-    except:
-        pass
-
-    # Memmory
-    if par[0] == '[' and par[-1] == "]":
-        par = par[1:-1]
-        a = Memmory(None, None)
-        for r in MOD_00_RM:
-            if r in par:
-                a.source = r
-                par = par.replace(r + '+', "+")
-                break
-        else:
-            raise Exception("Nebyl rozpoznán segment")
-
-        if par[0] == "+":
-            par = par.replace('+', '')
-            # If is not ok, it's the users problem.
-            a.displacement = parse_number(par)
-
-        return a
-
-    # Pointer
-    if "PTR" in par:
-        par.replace("PTR", "", 1)  # Hope not
-        par.replace("FAR", "", 1)
-        return Label(par, include_segment=True)
-
-    raise Exception(f"Nebylo možné zpracovat parametr {par}")
-
-def parse_param_02(template: str, arg: str) -> 'Parameter':
-    # ? Je tato funkce vůbec k něčemu??
-    if template in SEG_REGS:
-        
-        return Register(arg)
-
-    ...
-
 
 def assemble(code: str) -> list[int]:
     labels = {}
@@ -115,6 +37,7 @@ def assemble(code: str) -> list[int]:
 
         for instr_params, info in possible_codes:
             if matches_args(instr_params.split(" "), args):
+                info = info.copy()
                 segments_templates[-1].append((instr_params, args, info))
                 break
         else:
@@ -143,8 +66,6 @@ def assemble(code: str) -> list[int]:
     return bytecode
 
 
-
-
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     line = capitalize_registers(line)
 
@@ -157,14 +78,15 @@ def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
 
     return label, instr, args
 
+
 def split_on(line: str, char: str) -> tuple[str, str]:
     return line.split(char, 1) if char in line else (line, "")
+
 
 def capitalize_registers(assembly_code):
     pattern = r'\b(' + '|'.join(LOWERCASE_REGISTERS) + r')\b'
     return re.sub(pattern, lambda m: m.group(0).upper(), assembly_code)
 
-# print(parse_line_parts(" HLT"))
 
 def get_instruction_size(instruction: str, args: list[str]) -> int:
     """Returns 0/8/16"""
@@ -249,7 +171,7 @@ def matches_args(templates: list[str], args: list[str]):
 
         if "[" in arg and "]" in arg:
             # Is a memmory:
-            if templ[0] not in ["G", "E"]:
+            if templ[0] not in ["E"]:
                 return False
             continue
 
@@ -259,24 +181,14 @@ def matches_args(templates: list[str], args: list[str]):
 
     return True
 
-
-# print(matches_args(["Ib"], ["42"]))
-# print(matches_args(["Ev"], ["BX"]))
-# print(matches_args(["Ev"], ["42"]))
-# print(matches_args(["Ev"], ["[42]"]))
-# print(matches_args(["Ev"], ["[BX+42]"]))
-# print(matches_args(["Gb"], ["AL"]))
-# print(matches_args(["Gb"], ["SS"]))
-# print(matches_args(["Gb"], ["34"]))
-
-# print("OK")
-
 Template = dict[str, None | int | list[int]]
+
 
 def convert_to_bytes(args: list[str], parameters: str, info: Template, 
                      labels: dict[str, int], # Hej už se to tu dost množí argumenty - chtělo by to přepracovat :-(
                      curr_instr_idx: int # TODO: Lepší název
                      ) -> list[int]:
+    """Converts instruction to bytecode."""
     # ! NOT TESTED !
     output = []
 
@@ -325,7 +237,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
 
             case "G":
                 reg_val = 0
-                if arg[1] == "b":
+                if param[1] == "b":
                     reg_val = RM_8_REGS.index(arg)
                 else:
                     reg_val = RM_16_REGS.index(arg) 
@@ -361,7 +273,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
 
                 else:
                     mod_val = 3  # Selects register 
-                    if arg[1] == "b":
+                    if param[1] == "b":
                         rm_val = RM_8_REGS.index(arg)
                     else:
                         rm_val = RM_16_REGS.index(arg)
@@ -398,7 +310,9 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
 
     return output
 
+
 def calculate_value(arg: str, labels: dict[str, int]) -> int:
+    """Returns the value of the argument."""
     parts = re.split(r"(?=[+-])", arg) # Splits by + and -, but keeps it in
     runnung_sum = 0
 
@@ -422,7 +336,22 @@ def calculate_value(arg: str, labels: dict[str, int]) -> int:
 
     return runnung_sum
 
+
+def parse_number(s: str) -> int:
+    # Parses sum of numbers and works with hex and binary
+    # Like: "3+4" -> 7
+    # "0Fh+4" -> 19
+
+    # TODO: implementovat součet
+    if s[-1] == "h":
+        return int(s[:-1], 16)
+    if s[-1] == "b":
+        return int(s[:-1], 2)
+    return int(s)
+
+
 def int_to_bytes(val: int, size: int) -> list[int]:
+    """Returns list of bytes, of the number in little endian."""
     output = []
 
     for _ in range(size // 8):
@@ -432,6 +361,16 @@ def int_to_bytes(val: int, size: int) -> list[int]:
     return output
 
 if __name__ == "__main__":
+    # print(matches_args(["Ib"], ["42"]))
+    # print(matches_args(["Ev"], ["BX"]))
+    # print(matches_args(["Ev"], ["42"]))
+    # print(matches_args(["Ev"], ["[42]"]))
+    # print(matches_args(["Ev"], ["[BX+42]"]))
+    # print(matches_args(["Gb"], ["AL"]))
+    # print(matches_args(["Gb"], ["SS"]))
+    # print(matches_args(["Gb"], ["34"]))
+
+    # print("OK")
     # print(calculate_value("42", {}))
     # print(calculate_value("42+42", {}))
     # print(calculate_value("42-42", {}))
@@ -441,6 +380,8 @@ if __name__ == "__main__":
     # print(calculate_value("lbl-42", {"lbl": 42}))
     # print(calculate_value("lbl- 42 + NoTomeUndefined", {"lbl": 42}))
     # print(matches_args(["3"], ["3"]))
+    print(matches_args(["Eb", "Gb"], ["AL", "[32]"]))
+
     code = """
 segment code
 label   MOV AX, 7
@@ -466,7 +407,7 @@ segment extra_segment
 
     code3 = """
 segment code
-        MOV AH, 7
+        MOV AH, [0]
 
 
 """

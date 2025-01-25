@@ -91,19 +91,6 @@ def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
     return instruction, span
 
 
-def parse_number(s: str) -> int:
-    # Parses sum of numbers and works with hex and binary
-    # Like: "3+4" -> 7
-    # "0Fh+4" -> 19
-
-    # TODO: implementovat součet
-    if s[-1] == "h":
-        return int(s[:-1], 16)
-    if s[-1] == "b":
-        return int(s[:-1], 2)
-    return int(s)
-
-
 class Instruction:
     def __init__(self):
         self.operation: str = None
@@ -114,12 +101,6 @@ class Instruction:
 
         self.bytes = []  # Aspoň aby tu něco bylo
         self.modrm: ModRM | None = None
-
-
-class Register:
-    def __init__(self, name):
-        self.name: str = name
-        self.size: int = 8 if name[1] in ['L', 'H'] else 16
 
 
 class ModRM:
@@ -156,6 +137,12 @@ class ModRM:
                 self.rm = Memmory(MOD_00_RM[self.rm_val], displ)
 
 
+class Register:
+    def __init__(self, name):
+        self.name: str = name
+        self.size: int = 8 if name[1] in ['L', 'H'] else 16
+
+
 class Immutable:
     def __init__(self, value):
         self.value = value
@@ -176,15 +163,7 @@ class Memmory:
         self.source: str = source if source is not None else ""
 
 
-class Label:
-    def __init__(self, label: str, displacement: int = 0, include_segment=False):
-        self.label = label
-        self.displacement: int = displacement
-        self.include_segment = include_segment
-
-
 Parameter = Register | Immutable | Memmory | Pointer
-ParameterOrLabel = Parameter | Label
 
 
 if __name__ == "__main__":
@@ -224,21 +203,12 @@ if __name__ == "__main__":
 
 
 """
-Co zbývá:
-ASSEMBLER
-- Zbýva prakticky vše
-Koncipované je to takto:
-1) Parsing parametrů
-2) Podle instrukce a parametrů vytvořit bytecode
-- problémy: assembler by měl zvládat základní matiku - např. MOV [n + 3], 4*5+1   --> MOV [(n+3)], 21
-
-
 DISASSEMBLER
 - Zpracování pointerů
 
 
 EMULÁTOR
-- vymyslet ukládání programu (seznam segmentů / seznam všech bajtů programu)
 - udělat vzorové řešení (dopsat předpřipravené funkce)
 - otestovat
++ napsat testy na úlohy
 """
