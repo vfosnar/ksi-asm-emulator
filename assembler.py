@@ -23,49 +23,63 @@ def get_byteslength(instruction, args):
     ...
 
 
-def parse_param(p: str) -> 'Parameter':  # Part of assembler
+def deprecated__parse_param(par: str) -> 'Parameter':  # Part of assembler
     """
-    ! Work in progress. Yet can't handle labels nor math (MOV [label + 2], 42)
+    ! Work in progress. Yet can't handle labels nor math např.: [label + 2]
     ? Perhaps regex would be usefull??
     pls help
     """
     # Register
-    if p in REGISTERS:
-        return Register(p)
+    if par in REGISTERS:
+        return Register(par)
+    
+    if "\"" in par or "'" in par:
+        raise Exception("Strings are not supported")
 
-    # Immutable
-    try:
-        print(parse_number(p))
-        return Immutable(parse_number(p))
+
+    if "FAR" in par:
+        # TODO: Handle 
+        ... 
+
+    try:# Immutable    
+        return Immutable(parse_number(par))
     except:
         pass
 
     # Memmory
-    if p[0] == '[' and p[-1] == "]":
-        p = p[1:-1]
+    if par[0] == '[' and par[-1] == "]":
+        par = par[1:-1]
         a = Memmory(None, None)
         for r in MOD_00_RM:
-            if r in p:
+            if r in par:
                 a.source = r
-                p = p.replace(r + '+', "+")
+                par = par.replace(r + '+', "+")
                 break
         else:
             raise Exception("Nebyl rozpoznán segment")
 
-        if p[0] == "+":
-            p = p.replace('+', '')
+        if par[0] == "+":
+            par = par.replace('+', '')
             # If is not ok, it's the users problem.
-            a.displacement = parse_number(p)
+            a.displacement = parse_number(par)
 
         return a
 
     # Pointer
-    if "PTR" in p:
-        p.replace("PTR", "", 1)  # Hope not
-        p.replace("FAR", "", 1)
-        return Label(p, include_segment=True)
+    if "PTR" in par:
+        par.replace("PTR", "", 1)  # Hope not
+        par.replace("FAR", "", 1)
+        return Label(par, include_segment=True)
 
-    raise Exception(f"Nebylo možné zpracovat parametr {p}")
+    raise Exception(f"Nebylo možné zpracovat parametr {par}")
+
+def parse_param_02(template: str, arg: str) -> 'Parameter':
+    # ? Je tato funkce vůbec k něčemu??
+    if template in SEG_REGS:
+        
+        return Register(arg)
+
+    ...
 
 
 def assemble(code: str) -> list[int]:
@@ -78,7 +92,7 @@ def assemble(code: str) -> list[int]:
     for i, line in enumerate(code.split("\n")):
         line = re.sub(r'\s+', ' ', line)  # Make all whitespace one space
 
-        if line == "":
+        if line.strip() == "":
             continue
 
         if line.startswith("segment"):
@@ -88,7 +102,8 @@ def assemble(code: str) -> list[int]:
             continue
 
         label, instr, args = parse_line_parts(line)
-        size = get_instruction_size(args)
+
+        size = get_instruction_size(instr, args)
 
         if label != "":
             labels[label] = byte_length
@@ -105,94 +120,79 @@ def assemble(code: str) -> list[int]:
         else:
             raise Exception(f"Invalid arguments for instruction {instr}")
 
-        byte_length += info.expected_bytes
-    
+        byte_length += info["expected_length"]
+
     bytecode = []
 
     for templates in segments_templates:
+        segment_bytecode = []
         for params, args, info in templates:
-            bytes = convert_to_bytes(args, params, info)
+            bytes = convert_to_bytes(args, params, info, labels, len(bytecode))
 
-            if len(bytes) != info.expected_bytes:
+            if len(bytes) != info["expected_length"]:
                 # 844 - random number, kdybych někde jinde přidával stejnou message
-                raise Exception(f"Chyba emulátoru. Prosím napiš na Diskusní fórum úlohy. (ErrCode: 844)") 
+                raise Exception(f"Chyba emulátoru. Prosím napiš na Diskusní fórum úlohy. (ErrCode: 844 - neočekávaný počet bajtů)") 
             
-            bytecode.append(bytes)
+            segment_bytecode.extend(bytes)
         
+
         # TODO: Doplnit None do nějakého násobku 2 nebo tak??
-        bytecode.extend([None] * 42)
-        
-    ...
+        segment_bytecode.extend([None for _ in range(42)])
+        bytecode.extend(segment_bytecode)
+
+    return bytecode
 
 
-def eval_label(arg: str, labels: dict[str, int]) -> str:
-    # TODO!!
-    ...
 
 
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     label, line = line.split(" ", 1)  # If no label, empty string
-    instr, line = line.split(" ", 1)
+    instr, line = split_on(line, " ")
     # regex to split by ';' but ignore semicolons within strings
-    line = re.split(r'(?<!");', line, 1)[0]
+    # line = re.split(r'(?<!");', line, 1)[0]
+    line, _ = split_on(line, ";")
 
     args = [l.strip() for l in line.split(",")]
 
     return label, instr, args
 
+def split_on(line: str, char: str) -> tuple[str, str]:
+    return line.split(char, 1) if char in line else (line, "")
 
-# def get_bytecode_info(instruction, args) -> dict[str, int]:
-#     assert instruction in INSTRUCTIONS
+# print(parse_line_parts(" HLT"))
 
-#     possible_codes = INSTRUCTIONS[instruction]
-
-#     prefix = None
-#     for arg in args:
-#         for test_prefix in PREFIXES:
-#             if test_prefix in arg:
-#                 prefix = prefix
-
-#     if len(possible_codes) == 1:
-#         # TODO: Ještě počítat s prefixy!!!!
-#         return possible_codes[0][2]  # TODO: Upravit instructions table
-
-#     # a) Memmory (obsahuje "[" a "]")
-#     #  - a1) Z ModR/M (kód Eb/Ev/Ew)
-#     #  - a2) Přímo encoded bez ModR/M (kód Ob/Ov) ((není Ow))
-#     # b) Register (je to register)
-#     #  - b1) General register (kód Gb/Gv/Gw)
-#     #  - b2) Register form ModR/M (kód Eb/Ev/Ew)
-#     #  - b3) Konkrétní registr (AX, AL, AH, ..., SI, BP, ...)
-#     #  - b4) Segment register z modr/m (kód Sw)
-#     # c) Immediate
-#     #  - c1) Kód Ib/Iv/Iw
-#     #  - c2) Pointer - JMP, CALL (kód Ap)
-#     #  - c3) Relative - JMP, CALL (kód Jb/Jv)
-#     #  - c4) 1 - INT (kód 1)
-#     #  - c5) 3 - INT (kód 3)
-
-#     # Get operation size (byte/word/none)
-
-#     for code in possible_codes:
-#         # Try to match args with code
-
-#         ...
-#     ...
-
-
-def get_instruction_size(args: list[str]) -> int:
+def get_instruction_size(instruction: str, args: list[str]) -> int:
     """Returns 0/8/16"""
+    if instruction in INSTRUCTIONS_WITHOUT_PARAMETER:
+        return 0
+    
+    if instruction == "INT": # Hnusný hardcode, ale zjistil jsem to pozdě
+        return 0 if args[0] == "3" else 8
+    
+    if instruction in ["JMP", "CALL"]:
+        if "SHORT" in args[0]:
+            return 8
+        if "FAR" in args[0]:
+            return 32
+        return 16
+
+    if instruction[0] == "J":
+        # JZ, JNZ, ...
+        return 8
+
     if args == []:
         return 0
 
     size = None
 
-    for arg in args:
+    for i, arg in enumerate(args):
         figured = None
         if "byte " in arg.lower():
             figured = 8
+            args[i] = arg.replace("byte ", "")
         elif "word " in arg.lower():
             figured = 16
+            args[i] = arg.replace("word ", "")
 
         elif arg in RM_8_REGS:
             figured = 8
@@ -216,6 +216,14 @@ def matches_args(templates: list[str], args: list[str]):
 
     for i in range(len(templates)):
         templ, arg = templates[i], args[i].strip()
+
+        if templ == "":
+            continue
+
+        if templ in ["1", "3"]:
+            if arg != templ:
+                return False
+            continue
 
         # TODO: Tohle vypadá tak strašně. Acho jo. Musím to přepsat
         if arg in SEG_REGS:
@@ -255,14 +263,196 @@ def matches_args(templates: list[str], args: list[str]):
 
 Template = dict[str, None | int | list[int]]
 
+def convert_to_bytes(args: list[str], parameters: str, info: Template, 
+                     labels: dict[str, int], # Hej už se to tu dost množí argumenty - chtělo by to přepracovat :-(
+                     curr_instr_idx: int # TODO: Lepší název
+                     ) -> list[int]:
+    # ! NOT TESTED !
+    output = []
 
-def convert_to_bytes(args: list[str], parameters: str, info: Template) -> list[int]:
+    # --- 1) Vyplnit celé info
+    info["data"] = []
+    # Prefixes
+    for prefix in PREFIXES:
+        for i, arg in enumerate(args):
+            if prefix in arg:
+                args[i] = arg.replace(prefix, "")
+                if prefix in info and info[prefix] is not None:
+                    raise Exception("Can't have two prefixes or sth - problem")
+                info["prefix"] = PREFIX_CODES[prefix]
 
-    ...
+    # Parse args
+    for i, param in enumerate(parameters.split(" ")):
+        arg = args[i]
 
+        if param == "":
+            continue
+
+        if param in REGISTERS:
+            # Encoded in opcode, no more details needed
+            continue
+
+        match param[0]:
+            case "A":
+                if ":" in arg:
+                    seg, off = [p.strip() for p in arg.split(":")]
+                    output.extend(int_to_bytes(calculate_value(off, labels), 16))
+                    output.extend(int_to_bytes(calculate_value(seg, labels), 16))
+                    
+            case "J":
+                # Relative offset
+                # Calculate distance, assert distance < 2**x
+                desitny = calculate_value(arg, labels)
+                dist = desitny - curr_instr_idx
+                size = 8 if param[1] == "b" else 16
+                convert_to_bytes(dist, size)
+                info["data"].extend(dist)
+
+            case "I":
+                val = calculate_value(arg, labels)
+                size = 8 if param[1] == "b" else 16
+                info["data"].extend(int_to_bytes(val, size))
+
+            case "G":
+                reg_val = 0
+                if arg[1] == "b":
+                    reg_val = RM_8_REGS.index(arg)
+                else:
+                    reg_val = RM_16_REGS.index(arg) 
+
+                if "modrm" not in info:
+                    info["modrm"] = 0
+
+                info["modrm"] += reg_val *8  # Reg part of modrm
+
+            case "E":
+                if "modrm" not in info: # Code duplicity
+                    info["modrm"] = 0
+
+                rm_val, mod_val = 0, 0
+                if arg[0] == "[" and arg[-1] == "]":
+                    # Assert arg is without prefix
+                    arg = arg[1:-1]
+
+                    for i, regref in enumerate(MOD_00_RM):
+                        if regref in arg:
+                            rm_val = i
+                            arg = arg.replace(regref, "")
+                            break
+                    else:
+                        rm_val = 6 # Only displacement - protože prostě někdo si řelk, jo, tohle je dobrý nápad. viz tabulka
+
+                    displ = calculate_value(arg, labels)
+                    size = 0
+                    if displ != 0:
+                        size = 8 if displ < 2**8 else 16
+                        info["data"].extend(displ, size)
+                        mod_val = size // 8
+
+                else:
+                    mod_val = 3  # Selects register 
+                    if arg[1] == "b":
+                        rm_val = RM_8_REGS.index(arg)
+                    else:
+                        rm_val = RM_16_REGS.index(arg)
+
+                info["modrm"] += rm_val
+                info["modrm"] += mod_val * 64
+
+                
+            case "S":
+                # Segment register
+                reg_val = SEG_REGS.index(arg)
+                info["modrm"] += reg_val * 8
+                # ? Snad je to správně
+
+    if "E" in "".join(parameters):
+        to_fill = info["expected_length"] - 1 - (1 if "prefix" in info else 0) - (1 if "modrm" in info else 0)
+        info["data"].extend([0x90] * to_fill)
+    # 1) Register / Memmory (=> ModR/M + možný displacement - taky podle toho upravid Mod) 
+    # 2) Ap (pointer) -> uložit segment a offset
+    # 3) I (immediate) -> uložit hodnotu
+
+
+    # --- 2) Předělat info na bytecode
+    if "prefix" in info and info["prefix"] is not None:
+        output.append(info["prefix"])
+
+    output.append(info["opcode"])
+
+    if "modrm" in info:
+        output.append(info["modrm"])
+
+    output.extend(info["data"])
+
+    return output
+
+def calculate_value(arg: str, labels: dict[str, int]) -> int:
+    parts = re.split(r"(?=[+-])", arg) # Splits by + and -, but keeps it in
+    runnung_sum = 0
+
+    for part in parts:
+        if part == "":
+            continue
+        
+        sign = "-" if part[0] == "-" else "+"
+        part = part.replace(sign, "")
+        part = part.strip()
+
+        part_val = 0
+
+        if part[0].isdigit():
+            part_val = parse_number(part)
+        else:
+            assert part in labels, f"Label \"{part}\" is not defined"
+            part_val = labels[part]
+
+        runnung_sum += part_val if sign == "+" else -part_val
+
+    return runnung_sum
+
+def int_to_bytes(val: int, size: int) -> list[int]:
+    output = []
+
+    for _ in range(size // 8):
+        output.append(val % 2**8)
+        val //= 2**8
+
+    return output
 
 if __name__ == "__main__":
-    assemble("segment code \nllaabel MOV AX, 7")
+    # print(calculate_value("42", {}))
+    # print(calculate_value("42+42", {}))
+    # print(calculate_value("42-42", {}))
+    # print(calculate_value("42+42-42", {}))
+    # print(calculate_value("lbl", {"lbl": 42}))
+    # print(calculate_value("lbl+42", {"lbl": 42}))
+    # print(calculate_value("lbl-42", {"lbl": 42}))
+    # print(calculate_value("lbl- 42 + NoTomeUndefined", {"lbl": 42}))
+    print(matches_args(["3"], ["3"]))
+    code = """
+segment code
+label   MOV AX, 7
+        MOV BX, 42
+        ADD AX, BX
+        INC AX
+        HLT
+    """
+
+    code2 = """
+segment code
+label   DEC byte [BX]
+"""
+
+
+    # program = assemble("segment code \nllaabel ADD AX, BX")
+    program = assemble(code2)
+    print(program)
+
+    # assemble("segment code \nllaabel JMP lbl_02")
+
+
+    
     ...
 
 
