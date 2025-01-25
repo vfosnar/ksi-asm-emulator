@@ -252,6 +252,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                     info["modrm"] = 0
 
                 rm_val, mod_val = 0, 0
+                is_special = False  # if mod=00 and rm=110 (only 16 displacement)
                 if arg[0] == "[" and arg[-1] == "]":
                     # Assert arg is without prefix
                     arg = arg[1:-1]
@@ -262,14 +263,18 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                             arg = arg.replace(regref, "")
                             break
                     else:
+                        is_special = True
                         rm_val = 6 # Only displacement - protože prostě někdo si řelk, jo, tohle je dobrý nápad. viz tabulka
 
-                    displ = calculate_value(arg, labels)
-                    size = 0
-                    if displ != 0:
+                    if arg != "":
+                        displ = calculate_value(arg, labels)
                         size = 8 if displ < 2**8 else 16
-                        info["data"].extend(int_to_bytes(displ, size))
-                        mod_val = size // 8
+                        if not is_special:
+                            info["data"].extend(int_to_bytes(displ, size))
+                            mod_val = size // 8
+                        else:
+                            info["data"].extend(int_to_bytes(displ, 16))
+
 
                 else:
                     mod_val = 3  # Selects register 
@@ -311,7 +316,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
     return output
 
 
-def calculate_value(arg: str, labels: dict[str, int]) -> int:
+def calculate_value(arg: str, labels: dict[str, int]) -> int | None:
     """Returns the value of the argument."""
     parts = re.split(r"(?=[+-])", arg) # Splits by + and -, but keeps it in
     runnung_sum = 0
@@ -381,6 +386,10 @@ if __name__ == "__main__":
     # print(calculate_value("lbl- 42 + NoTomeUndefined", {"lbl": 42}))
     # print(matches_args(["3"], ["3"]))
     print(matches_args(["Eb", "Gb"], ["AL", "[32]"]))
+    print(calculate_value("42+23-lbl", {"lbl": 42}))
+    print(calculate_value("", {"lbl": 42}))
+    
+
 
     code = """
 segment code
@@ -417,7 +426,7 @@ segment code
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
     program = assemble(code3)
-    print([hex(b) for b in program if b is not None])
+    print([bin(b) for b in program if b is not None])
 
     # assemble("segment code \nllaabel JMP lbl_02")
 

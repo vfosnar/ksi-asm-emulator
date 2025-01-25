@@ -128,9 +128,10 @@ class Emulator:
             case Memmory():
                 offset = arg.displacement
                 for reg in arg.source.split("+"):
-                    offset += self.get_register(reg)
-
-                output = self.get_byte(arg.segment, offset)
+                    if reg != "":
+                        offset += self.get_register(reg)
+                segment = self.get_register(arg.segment)
+                output = self.get_byte(segment, offset)
             case Register():
                 output = self.get_register(arg.name)
 
@@ -321,6 +322,9 @@ segment code
     code2 = """
 segment code
         MOV AH, [0]
+        ADD AH, 8+8
+        MOV [0], AH
+        hlt
 """
 
     program = assemble(code2)
@@ -328,8 +332,10 @@ segment code
 
     e = Emulator()
     e.program = program
+    e.registers["DS"] = 0  # For debugging purposes
     e.run()
     print(e.registers)
+    print([hex(b) for b in e.program if b is not None])
     
     # e = Emulator()
     # e.program = [
