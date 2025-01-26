@@ -20,7 +20,7 @@ CF, PF, ZF, SF, OF = 0, 2, 6, 7, 11
 
 class Emulator:
 
-    def __init__(self):
+    def __init__(self, program):
         self.registers = {
             # 16-bitový registr AX je složen ze dvou 8-botivých registrů AH,AL
             "AL": None,
@@ -47,7 +47,7 @@ class Emulator:
             "FI": 0
         }
 
-        self.program = []  # Seznam bajtů
+        self.program = program # Seznam bajtů
         self.running = True  # Může být uspáno pomocí instrukce HLT
 
     def run(self):
@@ -368,8 +368,7 @@ y       db 0ABh
     program = assemble(code3)
     print(program)
 
-    e = Emulator()
-    e.program = program
+    e = Emulator(program)
     # e.registers["DS"] = 0  # For debugging purposes
     e.run()
     print(e.registers)
