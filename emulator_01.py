@@ -182,7 +182,21 @@ class Emulator:
         carry = result > 2**(8*opsize)
         self.set_flag(CF, carry)
 
-    def set_of(self, before: int, after: int, opsize: int):
+    def set_of(self, result, opsize):
+        overflow = not (2**(8*opsize - 1) <= result < 2**(8*opsize))
+        self.set_flag(OF, overflow)
+
+    def set_flags(self, result: int, opsize: int, flags: list[Flag]):
+        for flag in flags:
+            self.set_flag(flag, False)
+        
+        # result is in twos complement
+        if not (2**(opsize - 1) <= result < 2**opsize):
+            self.set_flag(OF, True)
+        
+        result = to_twos_complement(result, opsize)
+
+
 
         ...
 
@@ -195,13 +209,17 @@ class Emulator:
 
     def ADD(self, instruction):
         # TODO: Dodělat znaménkové přetečení
-        vysledek = self.get_value(instruction.arguments[0])
-        vysledek += self.get_value(instruction.arguments[1])
-        self.set_cf(vysledek, instruction.size)
+        val1 = self.get_value(instruction.arguments[0])
+        val2 = self.get_value(instruction.arguments[1])
+
+        vysledek = from_2compl(val1, instruction.size) + from_2compl(val2, instruction.size)
+        self.set_of(vysledek, instruction.size)
+
         vysledek %= 2**(8*instruction.size)
 
         self.set_value(instruction.arguments[0], vysledek, instruction.size)
 
+        self.set_cf(vysledek, instruction.size)
         self.set_sf(vysledek, instruction.size)
         self.set_zf(vysledek)
         self.set_pf(vysledek)
@@ -320,26 +338,18 @@ class Emulator:
         self.running = False
 
 
-if __name__ == "__main__":
-    code = """
-segment code
-    MOV AL, 7
-    MOV AH, 8
-    ADD AX, 8
-    HLT
-"""
-    code2 = """
-segment code
-        MOV BX, data
-        MOV DS, BX
-        MOV AH, [0]
-        ADD AH, 8+8
-        MOV [0], AH
-        hlt
-segment data
-n       db 42
-"""
+# TODO: Přemístit na lepší místo; vymyslet lepší název
+def to_twos_complement(num, size):
+    if num < 0:
+        num += 2**size 
+    return num
 
+def from_2compl(num, size):
+    if num > 2**(size - 1) - 1:
+        num -= 2**size
+    return num
+
+if __name__ == "__main__":
     code3 = """
 segment code
         MOV BX, data
@@ -353,7 +363,6 @@ segment data
 n       db 42
 x       resb 4
 y       db 0ABh
-
 """
 
     program = assemble(code3)
@@ -366,60 +375,3 @@ y       db 0ABh
     print(e.registers)
     print([hex(b) for b in e.program if b is not None])
     
-    # e = Emulator()
-    # e.program = [
-    #     0xB0, 0x07,  # MOV AL, 7
-    #     0xB4, 0x08,  # MOV AH, 8
-    #     0x00, 0xE0,  # ADD AL, AH
-    #     0xF4,  # HLT
-    # ] + [None for _ in range(42)]
-
-    # e.run()
-    # print(e.registers)
-
-    # ====================== starý kód
-
-    # i1 = Instruction()
-    # i1.operation = "MOV"
-    # i1.arguments = [
-    #     Register("AL"),
-    #     Register("DL"),
-    #     # Immutable(45)
-    # ]
-
-    # e = Emulator()
-    # e.program = [None for _ in range(42)]
-
-    # e.registers["DL"] = 123
-    # print(e.registers["AL"])
-    # e.MOV(i1)
-    # print(e.registers["AL"])
-
-    # e.registers["DS"] = 0
-
-    # i2 = Instruction()
-    # i2.operation = "MOV"
-    # i2.size = 16
-    # i2.arguments = [
-    #     Memmory(None, 0, "DS"),
-    #     Immutable(2735),
-    # ]
-
-    # print(e.program[0])
-    # e.MOV(i2)
-    # print(e.program[0])
-    # print(e.program[1])
-
-    # e.set_register("AX", 0b1111_1111_1111_1111)
-
-    # print(e.get_register("AX"))
-
-    # i3 = Instruction()
-    # i3.operation = "AND"
-    # i3.size = 16
-    # i3.arguments = [
-    #     Register("AX"),
-    #     Immutable(0b11101),
-    # ]
-    # e.XOR(i3)
-    # print(e.get_register("AX"))
