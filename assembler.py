@@ -84,7 +84,6 @@ def assemble(code: str) -> list[int]:
             segment_bytecode.extend(bytes)
         
 
-        # TODO: Doplnit None do nějakého násobku 2 nebo tak??
         segment_bytecode.extend([None for _ in range(bytes_remaining_in_segment(len(segment_bytecode)))])
         bytecode.extend(segment_bytecode)
 
@@ -168,7 +167,9 @@ def get_instruction_size(instruction: str, args: list[str]) -> int:
 
 
 def matches_args(templates: list[str], args: list[str]):
-    assert len(templates) == len(args), "Nevalidní počet argumentů"
+    if len(templates) != len(args):
+        return False
+    # assert len(templates) == len(args), "Nevalidní počet argumentů"
 
     for i in range(len(templates)):
         templ, arg = templates[i], args[i].strip()
@@ -267,8 +268,8 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                 desitny = calculate_value(arg, labels)
                 dist = desitny - curr_instr_idx
                 size = 8 if param[1] == "b" else 16
-                convert_to_bytes(dist, size)
-                info["data"].extend(dist)
+                bytes = int_to_bytes(dist, size)
+                info["data"].extend(bytes)
 
             case "I":
                 val = calculate_value(arg, labels)
@@ -336,8 +337,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
                 # ? Snad je to správně
 
     if "E" in "".join(parameters):
-        to_fill = info["expected_length"] - len(info["data"]) - (1 if "prefix" in info else 0) - (1 if "modrm" in info else 0)
-        to_fill -= 1 # TODO: Ověř si, že to tak doopravdy má být
+        to_fill = info["expected_length"] - len(info["data"]) - (1 if "prefix" in info else 0) - (1 if "modrm" in info else 0) - 1
         info["data"].extend([0x90] * to_fill)
     # 1) Register / Memmory (=> ModR/M + možný displacement - taky podle toho upravid Mod) 
     # 2) Ap (pointer) -> uložit segment a offset
@@ -388,8 +388,6 @@ def parse_number(s: str) -> int:
     # Parses sum of numbers and works with hex and binary
     # Like: "3+4" -> 7
     # "0Fh+4" -> 19
-
-    # TODO: implementovat součet
     if s[-1] == "h":
         return int(s[:-1], 16)
     if s[-1] == "b":
@@ -480,10 +478,16 @@ x       resb 4
 y       db 0ABh
 """
 
+    code6 = """
+segment test
+label   NEG AX
+        NEG byte [BX+1234h]
+        JO label
+"""
 
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
-    program = assemble(code5)
+    program = assemble(code6)
     print(program)
     # print([hex(b) for b in program if b is not None])
 

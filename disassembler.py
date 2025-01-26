@@ -65,6 +65,10 @@ def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
             instruction.arguments.append(Immutable(byte))
             continue
 
+        if arg[0] == "J":
+            instruction.arguments.append(Immutable(load_next()))
+            continue
+
         if arg[0] == "A":
             raise NotImplementedError("TODO: dodělat")
             continue
@@ -105,13 +109,12 @@ class Instruction:
 
 class ModRM:
     def __init__(self, byte, is_8b: bool, load_byte):
-        self.byte = byte  # Asi k ničemu, ale třeba se to bude hodit TODO: Vymaž before release
+        self.byte = byte
 
         self.mod: int = byte // 64
         self.reg_val: int = (byte // 8) % 8
         self.rm_val: int = byte % 8
 
-        # self.reg: Register
         # so that there couldn't be None - TODO: rewrite
         self.rm: Memmory | Register = Register("Dummy")
 
@@ -189,6 +192,10 @@ if __name__ == "__main__":
     x = parse_next_instruction([
         0xF7,
         0xD8,
+    ], 0)
+
+    x = parse_next_instruction([
+        0x70, 0x03 # JO +3
     ], 0)
 
     print(x)

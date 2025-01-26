@@ -4,11 +4,12 @@ from emulator import Emulator
 # Dá se i načíst ze souboru (.asm)
 code = """
 segment code
-        MOV BX, data
+        MOV BX, data    ; Pokud chcete používat data, musíte nastavit DS
         MOV DS, BX
+
         MOV BX, n
-        MOV AL, [BX]
-        nop             ; V AL by mělo být 42 
+        MOV AL, [BX]    ; Do AL se přenese 42
+        
         HLT
 
 segment data

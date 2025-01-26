@@ -56,10 +56,23 @@ class Emulator:
                 self.program, self.registers["IP"])
             self.registers["IP"] += span
             match instr.operation:
-                case "ADD":
-                    self.ADD(instr)
                 case "MOV":
                     self.MOV(instr)
+                case "ADD":
+                    self.ADD(instr)
+                # TODO Donplnit zbyle instrukce
+
+                case "AND":
+                    self.AND(instr)
+
+                case "OR":
+                    self.OR(instr)
+                case "XOR":
+                    self.XOR(instr)
+                
+                case "NEG":
+                    self.NEG(instr)
+
 
                 case "NOP":
                     self.NOP(instr)
@@ -188,24 +201,42 @@ class Emulator:
 
     def set_flags(self, result: int, opsize: int, flags: list[Flag]):
         for flag in flags:
+            if flag not in [OF, CF, ZF, PF, SF]:
+                raise Exception(f"Flag {flag} is not supported.")
             self.set_flag(flag, False)
         
         # result is in twos complement
-        if not (2**(opsize - 1) <= result < 2**opsize):
+        if OF in flags and not (2**(opsize - 1) <= result < 2**opsize):
             self.set_flag(OF, True)
         
+        if CF in flags:
+            is_carry = not (2**(8*opsize) <= result < 2**(8*opsize + 1))
+            self.set_flag(CF, is_carry)
+
+        if ZF in flags:
+            self.set_flag(ZF, result == 0)
+
+        # Need binary number
         result = to_twos_complement(result, opsize)
 
-
-
-        ...
-
+        if PF in flags:
+            counter = 0
+            for _ in range(8):
+                counter += result % 2
+                result //= 2
+            self.set_flag(PF, counter % 2 == 0)
+        
+        if SF in flags:
+            sign = result // 2**(8*opsize - 1)
+            self.set_flag(SF, sign == 1)
+        
     def MOV(self, instruction: Instruction):
         assert len(instruction.arguments) == 2
         arg1, arg2 = instruction.arguments
 
         to_insert = self.get_value(arg2)
         self.set_value(arg1, to_insert, instruction.size)
+        # MOV Nenastavouje příznaky
 
     def ADD(self, instruction):
         # TODO: Dodělat znaménkové přetečení
@@ -218,6 +249,8 @@ class Emulator:
         vysledek %= 2**(8*instruction.size)
 
         self.set_value(instruction.arguments[0], vysledek, instruction.size)
+
+        self.set_flags(vysledek, instruction.size, [OF, CF, ZF, PF, SF])
 
         self.set_cf(vysledek, instruction.size)
         self.set_sf(vysledek, instruction.size)
@@ -250,6 +283,9 @@ class Emulator:
 
     def NEG(self, instruction):
         val = self.get_value(instruction.arguments[0])
+        val = ~val + 1
+        self.set_value(instruction.arguments[0], val, instruction.size)
+        # TODO: doplnit flags
 
     def CMP(self, instruction):
         pass
@@ -352,6 +388,15 @@ def from_2compl(num, size):
 if __name__ == "__main__":
     code3 = """
 segment code
+        MOV BX, data
+
+        MOV AL, 11111111b
+        MOV AH, 10011001b
+        AND AL, AH
+        NEG AX
+        HLT
+
+
         MOV BX, data
         MOV DS, BX
         MOV BX, n
