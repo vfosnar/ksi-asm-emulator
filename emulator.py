@@ -6,9 +6,13 @@ Flag = int
 CF, PF, ZF, SF, OF = 0, 2, 6, 7, 11
 
 
+MAX_INSTRUCTIONS = 500
+
 class Emulator:
 
     def __init__(self, program):
+        self.instructions_counter = 0
+
         self.registers = {
             # 16-bitový registr AX je složen ze dvou 8-botivých registrů AH,AL
             "AL": None,
@@ -43,10 +47,15 @@ class Emulator:
             "OR": self.OR,   "XOR": self.XOR, "NEG": self.NEG,
             "NOP": self.NOP, "INC": self.INC, "DEC": self.DEC,
             "HLT": self.HLT, "CMP": self.CMP, "TEST": self.TEST,
+            "JMP": self.JMP
         }
 
     def run(self):
         while self.running:
+            if self.instructions_counter > MAX_INSTRUCTIONS:
+                raise Exception(f"Váš program vykonal {self.instructions_counter} instrukcí. Zřejmě došlo k zacyklení. Pokud ne, navyšte hodnotu MAX_INSTRUCTIONS.")
+            self.instructions_counter += 1
+            
             # TODO: nechci to dát dovnitř třídy??
             instr, span = parse_next_instruction(
                 self.program, 
@@ -338,6 +347,19 @@ class Emulator:
 
         self.update_flags(result, instruction.size, [ZF, PF, SF])
 
+    # ------- PROGRAM BRANCHING INSTRUCTIONS: --------
+    def JMP(self, instruction):
+        if isinstance(instruction.arguments[0], Pointer):
+            # Far jump
+            self.registers["IP"] = instruction.arguments[0].offset
+            self.registers["CS"] = instruction.arguments[0].segment
+        else:
+            # Near jump
+            assert isinstance(instruction.arguments[0], Immutable)
+            offset = instruction.arguments[0].value
+            raise NotImplemented("TODO: Finish short jump")            
+            
+
     # ------- ANOTHER INSTRUCTIONS: --------
     def NOP(self, instruction):
         pass  # Already implemented ;-)
@@ -437,8 +459,9 @@ n       db 42
 
     overflwo_test = """
 segment code
-        MOV AL, 255
+startt   MOV AL, 255
         ADD AL, 1
+        JMP FAR startt
         HLT
 """
 

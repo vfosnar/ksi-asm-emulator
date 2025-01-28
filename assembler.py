@@ -433,6 +433,7 @@ if __name__ == "__main__":
 
     jmps = """
 segment code
+        JMP loop_s
         JMP FAR dno
 
 loop_s  MOV AX, 0
@@ -456,9 +457,3 @@ n       db 42
     x = parse_next_instruction(program, 0)
 
     print(x)
-    # assemble("segment code \nllaabel JMP lbl_02")
-
-
-    ...
-
-
