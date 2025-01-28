@@ -1,5 +1,5 @@
 from disassembler import *
-from assembler import assemble # TODO: Tohle samozřejmě přepsat na jenom funkci assemble()
+from assembler import assemble
 
 # Flags
 Flag = int
@@ -7,6 +7,7 @@ CF, PF, ZF, SF, OF = 0, 2, 6, 7, 11
 
 
 MAX_INSTRUCTIONS = 500
+
 
 class Emulator:
 
@@ -38,7 +39,7 @@ class Emulator:
             "Fl": 0  # Flags register
         }
 
-        self.program = program # Seznam bajtů
+        self.program = program  # Seznam bajtů
         self.running = True  # Může být uspáno pomocí instrukce HLT
 
         self.instr_methods = {
@@ -47,25 +48,27 @@ class Emulator:
             "OR": self.OR,   "XOR": self.XOR, "NEG": self.NEG,
             "NOP": self.NOP, "INC": self.INC, "DEC": self.DEC,
             "HLT": self.HLT, "CMP": self.CMP, "TEST": self.TEST,
-            "JMP": self.JMP
+            "JMP": self.JMP, "CALL": self.CALL, "JO": self.JO,
         }
 
     def run(self):
         while self.running:
             if self.instructions_counter > MAX_INSTRUCTIONS:
-                raise Exception(f"Váš program vykonal {self.instructions_counter} instrukcí. Zřejmě došlo k zacyklení. Pokud ne, navyšte hodnotu MAX_INSTRUCTIONS.")
+                raise Exception(
+                    f"Váš program vykonal {self.instructions_counter} instrukcí. Zřejmě došlo k zacyklení. Pokud ne, navyšte hodnotu MAX_INSTRUCTIONS.")
             self.instructions_counter += 1
-            
+
             # TODO: nechci to dát dovnitř třídy??
             instr, span = parse_next_instruction(
-                self.program, 
+                self.program,
                 self.get_register("CS") + self.registers["IP"]
             )
             self.registers["IP"] += span
 
             if instr.operation not in self.instr_methods:
-                raise Exception(f"This emulator doesn't support this operation: {instr.operation}")
-            
+                raise Exception(
+                    f"This emulator doesn't support this operation: {instr.operation}")
+
             self.instr_methods[instr.operation](instr)
 
     def get_address(self, arg: Memmory):
@@ -76,10 +79,10 @@ class Emulator:
             offset += self.get_register(reg)
 
         return segment + offset
-    
+
     def get_register(self, reg: str):
         reg = reg.upper()
-        assert reg in REGISTERS, f"There is no \"{reg}\" register in this emulator."
+        assert reg in self.registers, f"There is no \"{reg}\" register in this emulator."
 
         if reg[1] == "X":
             output = self.get_register(reg[0]+"H") * 2**8
@@ -162,7 +165,7 @@ class Emulator:
 
         if val:
             f_reg = f_reg | (1 << flag)
-        
+
         self.registers["Fl"] = f_reg
 
     def get_flag(self, flag: Flag):
@@ -190,24 +193,24 @@ class Emulator:
 
     def update_of(self, result, opsize, numbers: list[int]):
         assert len(numbers) == 2, "Pro výpočet přetečení vložte dvě čísla."
-        
+
         sign1 = get_bit(numbers[0], opsize - 1)
         sign2 = get_bit(numbers[1], opsize - 1)
         sign_res = get_bit(result, opsize - 1)
 
         is_overflow = (sign1 == sign2) and (sign1 != sign_res)
         self.set_flag(OF, is_overflow)
-    
-    def update_flags(self, result: int, opsize: int, flags: list[int], 
-                  previous_numbers: list[int] = [] # TODO: Lepší jméno
-                  ):
+
+    def update_flags(self, result: int, opsize: int, flags: list[int],
+                     previous_numbers: list[int] = []  # TODO: Lepší jméno
+                     ):
         """Nastaví požadované příznaky. Výsledek vkládejte v přímém kódu s případným přetečením."""
         if CF in flags:
             self.update_cf(result, opsize)
-        
+
         if OF in flags:
             self.update_of(result, opsize, previous_numbers)
-        
+
         result = result % 2**opsize
 
         if SF in flags:
@@ -219,9 +222,9 @@ class Emulator:
         if PF in flags:
             self.update_pf(result)
 
-
     # ======== INSTRUCTIONS: ==========
     # ------- MOVE INSTRUCTIONS: --------
+
     def MOV(self, instruction: Instruction):
         to_insert = self.get_value(instruction.arguments[1])
         self.set_value(instruction.arguments[0], to_insert, instruction.size)
@@ -234,49 +237,60 @@ class Emulator:
 
         result = val1 + val2
 
-        self.set_value(instruction.arguments[0], result % (2**instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
+        self.set_value(instruction.arguments[0], result % (
+            2**instruction.size), instruction.size)
+        self.update_flags(result, instruction.size, [
+                          OF, CF, ZF, PF, SF], [val1, val2])
 
     def ADC(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
-        cf = 1 if self.get_flag(CF) else 0 
-        result = val1 + val2 + cf 
+        cf = 1 if self.get_flag(CF) else 0
+        result = val1 + val2 + cf
 
-        self.set_value(instruction.arguments[0], result % (2**instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
+        self.set_value(instruction.arguments[0], result % (
+            2**instruction.size), instruction.size)
+        self.update_flags(result, instruction.size, [
+                          OF, CF, ZF, PF, SF], [val1, val2])
 
     def SUB(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         result = val1 - val2
-        
-        self.set_value(instruction.arguments[0], result % 2**(instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
+
+        self.set_value(
+            instruction.arguments[0], result % 2**(instruction.size), instruction.size)
+        self.update_flags(result, instruction.size, [
+                          OF, CF, ZF, PF, SF], [val1, val2])
 
     def SBB(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         cf = 1 if self.get_flag(CF) else 0
         result = val1 - val2 - cf
-        
-        self.set_value(instruction.arguments[0], result % 2**(instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
+
+        self.set_value(
+            instruction.arguments[0], result % 2**(instruction.size), instruction.size)
+        self.update_flags(result, instruction.size, [
+                          OF, CF, ZF, PF, SF], [val1, val2])
 
     def INC(self, instruction):
         val = self.get_value(instruction.arguments[0]) + 1
-        self.set_value(instruction.arguments[0], val % (2**instruction.size), instruction.size)
+        self.set_value(instruction.arguments[0], val % (
+            2**instruction.size), instruction.size)
         self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
 
     def DEC(self, instruction):
         val = self.get_value(instruction.arguments[0]) - 1
-        self.set_value(instruction.arguments[0], val % (2**instruction.size), instruction.size)
+        self.set_value(instruction.arguments[0], val % (
+            2**instruction.size), instruction.size)
         self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
 
     def NEG(self, instruction):
         val = self.get_value(instruction.arguments[0])
         val = ~val + 1
-        self.set_value(instruction.arguments[0], val % (2**instruction.size), instruction.size)
+        self.set_value(instruction.arguments[0], val % (
+            2**instruction.size), instruction.size)
         self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
 
     def MUL(self, instruction):
@@ -328,7 +342,7 @@ class Emulator:
         self.set_value(instruction.arguments[0], result, instruction.size)
         # Nemění příznaky
 
-    def CBW(self, instruction): 
+    def CBW(self, instruction):
         pass
 
     # ------- COMPARING INSTRUCTIONS: --------
@@ -337,7 +351,8 @@ class Emulator:
         val2 = self.get_value(instruction.arguments[1])
         result = val1 - val2
 
-        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
+        self.update_flags(result, instruction.size, [
+                          OF, CF, ZF, PF, SF], [val1, val2])
 
     def TEST(self, instruction):
         # And, akorát se neukládá. Jen nastavuje příznaky (flags)
@@ -357,16 +372,24 @@ class Emulator:
             # Near jump
             assert isinstance(instruction.arguments[0], Immutable)
             offset = instruction.arguments[0].value
-            raise NotImplemented("TODO: Finish short jump")            
-            
+            raise NotImplemented("TODO: Finish short jump")
+
+    def CALL(self, instruction):
+        # TODO:
+        pass
+
+    def JO(self, instruction):
+        if self.get_flag(OF):
+            self.set_register("IP",
+                              self.get_register("IP") + instruction.arguments[0].value)
 
     # ------- ANOTHER INSTRUCTIONS: --------
+
     def NOP(self, instruction):
         pass  # Already implemented ;-)
 
     def CBW(self, instruction):
         pass
-
 
     # ROL, ROR, RCR, RCL - Rotate
     # SAL, SHL, SAR, SHR - Shift
@@ -392,77 +415,17 @@ class Emulator:
 def get_bit(number: int, position: int):
     return (number // 2**position) % 2
 
+
 if __name__ == "__main__":
-    code3 = """
-segment code
-        MOV BX, data
-
-        MOV AL, 11111111b
-        MOV AH, 10011001b
-        AND AL, AH
-        MOV AX, 7
-        NEG AX
-        HLT
-
-
-        MOV BX, data
-        MOV DS, BX
-        MOV BX, n
-        MOV AL, [BX]
-        nop             ; V AL by mělo být 42 
-        HLT
-
-segment data
-n       db 42
-x       resb 4
-y       db 0ABh
-"""
-
-    test_code = """
-segment code
-        MOV BX, data    ; Nastaví datový segment. Není podstatné
-        MOV DS, BX      
-
-        MOV AX, 42
-        SUB AX, [a]
-
-        MOV BX, 15
-        AND BX, 10101010b  ; b na konci označuje binární zápis čísla
-        INC BX
-        MOV [a], BX
-
-        HLT        
-
-segment data
-a       db 12
-"""
-
-    
-    code4 = """
-segment code
-        MOV BX, stack
-        MOV DS, BX
-        NOP
-        MOV AL, 200
-        MOV AH, 200
-        ADD AL, AH
-        NOP
-        MOV [dno], byte 22h
-        HLT
-
-segment stack
-        resb 16
-        db 14
-dno:    db ?
-n       db 42
-"""
 
     overflwo_test = """
 segment code
-startt   MOV AL, 255
+startt  MOV AL, 127
         ADD AL, 1
-        JMP FAR startt
+        JO konec
         HLT
+        JMP FAR startt
+konec   HLT
 """
 
     program = assemble(overflwo_test)
@@ -473,4 +436,3 @@ startt   MOV AL, 255
     e.run()
     print(e.registers)
     print([hex(b) for b in e.program if b is not None])
-    

@@ -1,5 +1,6 @@
 from data import *
 
+
 def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
     """Just in time dissasembler"""
     instruction = Instruction()
@@ -8,6 +9,7 @@ def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
     def load_next():
         nonlocal span
         byte = program[IP + span]
+        assert byte is not None, "Snaha načíst nedefinovaný byte jako instrukci"
         span += 1
         instruction.bytes.append(byte)
         return byte
@@ -197,7 +199,7 @@ if __name__ == "__main__":
     ], 0)
 
     x = parse_next_instruction([
-        0x70, 0x03 # JO +3
+        0x70, 0x03  # JO +3
     ], 0)
 
     print(x)
