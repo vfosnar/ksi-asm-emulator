@@ -11,8 +11,9 @@ def assemble(code: str) -> list[int]:
 
     templates = []
     segments_templates = []
+    labels_segment = {}
 
-    for i, line in enumerate(code.split("\n")):
+    for i, line in enumerate(code.split("\n")):  # Pls keep enumberate for error line info (W.I.P.)
         line = re.sub(r'\s+', ' ', line)  # Make all whitespace one space
 
         if line.strip() == "":
@@ -33,6 +34,7 @@ def assemble(code: str) -> list[int]:
 
         if label != "":
             labels[label] = segment_length
+            labels_segment[label] = segment # Bolí mě z toho oči, ale nestíhám. TODO: Přepsat
 
         if instr in DATA_INSTRUCTIONS:
             match instr[-1]:
@@ -75,7 +77,7 @@ def assemble(code: str) -> list[int]:
     for templates in segments_templates:
         segment_bytecode = []
         for params, args, info in templates:
-            bytes = convert_to_bytes(args, params, info, labels, len(bytecode))
+            bytes = convert_to_bytes(args, params, info, labels, len(bytecode), labels_segment)
 
             if len(bytes) != info["expected_length"]:
                 # 844 - random number, kdybych někde jinde přidával stejnou message
@@ -213,10 +215,12 @@ def matches_args(templates: list[str], args: list[str]):
 
 Template = dict[str, None | int | list[int]]
 
+MAX_SEGMENT_SIZE = 2**16
 
 def convert_to_bytes(args: list[str], parameters: str, info: Template, 
                      labels: dict[str, int], # Hej už se to tu dost množí argumenty - chtělo by to přepracovat :-(
-                     curr_instr_idx: int # TODO: Lepší název
+                     curr_instr_idx: int, # TODO: Lepší název
+                     labels_segment: dict[str, str] # TODO: Tohle už je cursed. Vymyslet lepší label architecutre
                      ) -> list[int]:
     """Converts instruction to bytecode."""
     # ! NOT TESTED !
@@ -224,10 +228,16 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
 
     if "opcode" not in info: 
         # Is a DATA instruction (Like DB or RESB)
+
         if info["instruction"][0] == "D": # DB, DW, DD
             for arg in args:
-                val = calculate_value(arg, labels)
-                output.extend(int_to_bytes(val, info["size"]))
+                if arg == "?":
+
+                    output.extend([None] * (info["size"] // 8))
+                else: 
+                    val = calculate_value(arg, labels)
+                    output.extend(int_to_bytes(val, info["size"]))
+
         elif info["instruction"][0] == "R":  # RESB, RESW, RESD
             output.extend([None] * info["expected_length"])
             
@@ -255,12 +265,24 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
             # Encoded in opcode, no more details needed
             continue
 
+        if "FAR" in arg: # Tohle určitě patří na lepší místo
+            arg = arg.replace("FAR ", "")
+            arg = arg.strip()
+
         match param[0]:
             case "A":
                 if ":" in arg:
                     seg, off = [p.strip() for p in arg.split(":")]
                     output.extend(int_to_bytes(calculate_value(off, labels), 16))
                     output.extend(int_to_bytes(calculate_value(seg, labels), 16))
+                else:
+                    # FAR JMP/CALL 
+                    if arg not in labels:
+                        if "+" in arg:
+                            raise Exception(f"Při FAR JMP/CALL prosím nepoužívejte matematiku. (kdyby něco, pište na DF)")
+                    
+                    output.extend(int_to_bytes(labels[arg], 16))
+                    output.extend(int_to_bytes(labels[labels_segment[arg]], 16)) # So cursed
                     
             case "J":
                 # Relative offset
@@ -480,14 +502,30 @@ y       db 0ABh
 
     code6 = """
 segment test
-label   NEG AX
-        NEG byte [BX+1234h]
-        JO label
+        JMP FAR [BX]
+    
+segment functions
+        resb 42
+label   HLT
+
+"""
+
+    code7 = """
+segment code
+        NOP
+        NOP
+        HLT
+
+segment stack
+        resb 16
+        db 14
+dno     db ?
+n       db 42
 """
 
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
-    program = assemble(code6)
+    program = assemble(code7)
     print(program)
     # print([hex(b) for b in program if b is not None])
 
