@@ -33,6 +33,7 @@ def assemble(code: str) -> list[int]:
         label, instr, args = parse_line_parts(line)
 
         if label != "":
+            label = label.replace(":", "")  
             labels[label] = segment_length
             labels_segment[label] = segment # Bolí mě z toho oči, ale nestíhám. TODO: Přepsat
 
@@ -514,12 +515,13 @@ label   HLT
 segment code
         NOP
         NOP
+        MOV [dno], byte 22h
         HLT
 
 segment stack
         resb 16
         db 14
-dno     db ?
+dno:    db ?
 n       db 42
 """
 
