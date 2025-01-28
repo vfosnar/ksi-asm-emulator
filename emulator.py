@@ -78,6 +78,10 @@ class Emulator:
             return output
 
         output = self.registers[reg]
+
+        if reg == "DS" and output is None:
+            raise Exception("Nemáte nastavený registr pro datový segment.")
+
         assert output is not None, f"Trying to get value of register {reg} with undefined value."
         return output
 
@@ -154,7 +158,7 @@ class Emulator:
         f_reg = self.registers["FI"]
         return (f_reg // (2**flag)) % 2
 
-    def set_pf(self, result):
+    def update_pf(self, result):
         counter = 0
         for _ in range(8):  # Kontroluje se dolní osmice
             counter += result % 2
@@ -162,102 +166,105 @@ class Emulator:
 
         self.set_flag(PF, counter % 2 == 0)
 
-    def set_zf(self, result):
+    def update_zf(self, result):
         self.set_flag(ZF, result == 0)
 
-    def set_sf(self, result, opsize):
+    def update_sf(self, result, opsize):
         """Sets the sign flag."""
         sign = result // 2**(8*opsize - 1)
         self.set_flag(SF, sign == 1)
 
-    def set_cf(self, result, opsize):
-        carry = result > 2**(8*opsize)
-        self.set_flag(CF, carry)
+    def update_cf(self, result, opsize):
+        self.set_flag(CF, result > 2**(8*opsize))
 
-    def set_of(self, result, opsize):
-        overflow = not (2**(8*opsize - 1) <= result < 2**(8*opsize))
-        self.set_flag(OF, overflow)
+    def update_of(self, result, opsize, numbers: list[int]):
+        assert len(numbers) == 2, "Pro výpočet přetečení vložte dvě čísla."
+        
+        sign1 = get_bit(numbers[0], opsize - 1)
+        sign2 = get_bit(numbers[1], opsize - 1)
+        sign_res = get_bit(result, opsize - 1)
 
-    def set_state_flags(self, result: int, opsize: int):
-        """Sets the ZF, PF and SF flag."""
-        self.set_zf(result)
-        self.set_pf(result)
-        self.set_sf(result, opsize)    
+        is_overflow = (sign1 == sign2) and (sign1 != sign_res)
+        self.set_flag(OF, is_overflow)
     
-    # ------- INSTRUCTIONS: --------
-    def MOV(self, instruction: Instruction):
-        assert len(instruction.arguments) == 2
-        arg1, arg2 = instruction.arguments
+    def update_flags(self, result: int, flags: list[int], opsize: int, 
+                  previous_numbers: list[int] = [] # TODO: Lepší jméno
+                  ):
+        """Nastaví požadované příznaky. Výsledek vkládejte v přímém kódu s případným přetečením."""
+        if CF in flags:
+            self.update_cf(result, opsize)
+        
+        if OF in flags:
+            self.update_of(result, opsize, previous_numbers)
 
-        to_insert = self.get_value(arg2)
-        self.set_value(arg1, to_insert, instruction.size)
+        if SF in flags:
+            self.update_sf(result, opsize)
+
+        if ZF in flags:
+            self.update_zf(result)
+
+        if PF in flags:
+            self.update_pf(result)
+
+
+    # ======== INSTRUCTIONS: ==========
+    # ------- MOVE INSTRUCTIONS: --------
+    def MOV(self, instruction: Instruction):
+        to_insert = self.get_value(instruction.arguments[1])
+        self.set_value(instruction.arguments[0], to_insert, instruction.size)
         # MOV Nenastavouje příznaky
 
     # ------- ARITMETIC INSTRUCTION: --------
-    def ADD(self, instruction):
-        # TODO: Dodělat znaménkové přetečení
+    def ADD(self, instruction: Instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
 
-        vysledek = from_2compl(val1, instruction.size) + from_2compl(val2, instruction.size)
-        self.set_of(vysledek, instruction.size)
+        result = val1 + val2
 
-        vysledek %= 2**(8*instruction.size)
-
-        self.set_value(instruction.arguments[0], vysledek, instruction.size)
-
-        self.set_state_flags(vysledek, instruction.size, [OF, CF, ZF, PF, SF])
-
-        self.set_cf(vysledek, instruction.size)
-        self.set_sf(vysledek, instruction.size)
-        self.set_zf(vysledek)
-        self.set_pf(vysledek)
-
-        ...
+        self.set_value(instruction.arguments[0], result % (2**instruction.size), instruction.size)
+        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
 
     def ADC(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         cf = 1 if self.get_flag(CF) else 0 
-        vysledek = val1 + val2 + cf 
-        self.set_value(instruction.arguments[0], vysledek % 2**(instruction.size), instruction.size)
-        # TODO: Dodělat flags
+        result = val1 + val2 + cf 
+
+        self.set_value(instruction.arguments[0], result % (2**instruction.size), instruction.size)
+        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
 
     def SUB(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
-        val2 = self.get_value(instruction.arguments[1]) 
+        val2 = self.get_value(instruction.arguments[1])
         result = val1 - val2
+        
         self.set_value(instruction.arguments[0], result % 2**(instruction.size), instruction.size)
-        # TODO: Dodělat flags
+        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
 
     def SBB(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         cf = 1 if self.get_flag(CF) else 0
         result = val1 - val2 - cf
+        
         self.set_value(instruction.arguments[0], result % 2**(instruction.size), instruction.size)
-        # TODO: Dodělat flags
+        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
 
     def INC(self, instruction):
         val = self.get_value(instruction.arguments[0]) + 1
-        val %= 2**(8*instruction.size)
-        self.set_value(instruction.arguments[0], val, instruction.size)
-
-        self.set_sf(val, instruction.size)
-        self.set_zf(val)
-        self.set_pf(val)
-        self.set_flag(OF, val == 0)  # TODO: Tohle se mi nějak nezdá
+        self.set_value(instruction.arguments[0], val % (2**instruction.size), instruction.size)
+        self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
 
     def DEC(self, instruction):
         val = self.get_value(instruction.arguments[0]) - 1
-        val %= 2**(8*instruction.size)
-        self.set_value(instruction.arguments[0], val, instruction.size)
+        self.set_value(instruction.arguments[0], val % (2**instruction.size), instruction.size)
+        self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
 
     def NEG(self, instruction):
         val = self.get_value(instruction.arguments[0])
         val = ~val + 1
-        self.set_value(instruction.arguments[0], val % 2**instruction.size, instruction.size)
-        # TODO: doplnit flags
+        self.set_value(instruction.arguments[0], val % (2**instruction.size), instruction.size)
+        self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
 
     def MUL(self, instruction):
         pass
@@ -271,17 +278,14 @@ class Emulator:
     def IDIV(self, instruction):
         pass
 
-    # ------- LOGICKÉ INSTRUKCE: --------
+    # ------- LOGIC INSTRUCTIONS: --------
     def AND(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         result = val1 & val2
 
         self.set_value(instruction.arguments[0], result, instruction.size)
-
-        self.set_sf(result, instruction.size)
-        self.set_zf(result)
-        self.set_pf(result)
+        self.update_flags(result, instruction.size, [ZF, PF, SF])
 
     def OR(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
@@ -290,9 +294,9 @@ class Emulator:
 
         self.set_value(instruction.arguments[0], result, instruction.size)
 
-        self.set_sf(result, instruction.size)
-        self.set_zf(result)
-        self.set_pf(result)
+        self.update_sf(result, instruction.size)
+        self.update_zf(result)
+        self.update_pf(result)
 
     def XOR(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
@@ -301,9 +305,9 @@ class Emulator:
 
         self.set_value(instruction.arguments[0], result, instruction.size)
 
-        self.set_sf(result, instruction.size)
-        self.set_zf(result)
-        self.set_pf(result)
+        self.update_sf(result, instruction.size)
+        self.update_zf(result)
+        self.update_pf(result)
 
     def NOT(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
@@ -314,13 +318,13 @@ class Emulator:
     def CBW(self, instruction): 
         pass
 
-    # ------- POROVNÁVACÍ  INSTRUKCE: --------
+    # ------- COMPARING INSTRUCTIONS: --------
     def CMP(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         result = val1 - val2
 
-        self.set_state_flags(result, instruction.size)
+        self.update_flags(result, instruction.size, [OF, CF, ZF, PF, SF], [val1, val2])
 
     def TEST(self, instruction):
         # And, akorát se neukládá. Jen nastavuje příznaky (flags)
@@ -328,11 +332,9 @@ class Emulator:
         val2 = self.get_value(instruction.arguments[1])
         result = val1 & val2
 
-        self.set_sf(result, instruction.size)
-        self.set_zf(result)
-        self.set_pf(result)
+        self.update_flags(result, instruction.size, [ZF, PF, SF])
 
-    # ------- DALŠÍ INSTRUKCE: --------
+    # ------- ANOTHER INSTRUCTIONS: --------
     def NOP(self, instruction):
         pass  # Already implemented ;-)
 
@@ -361,16 +363,8 @@ class Emulator:
         self.running = False
 
 
-# TODO: Přemístit na lepší místo; vymyslet lepší název
-def to_twos_complement(num, size):
-    if num < 0:
-        num += 2**size 
-    return num
-
-def from_2compl(num, size):
-    if num > 2**(size - 1) - 1:
-        num -= 2**size
-    return num
+def get_bit(number: int, position: int):
+    return (number // 2**position) % 2
 
 if __name__ == "__main__":
     code3 = """
@@ -417,7 +411,25 @@ segment data
 a       db 12
 """
 
-    program = assemble(code3)
+    
+    code4 = """
+segment code
+        MOV BX, stack
+        MOV DS, BX
+        NOP
+        NOP
+        MOV [dno], byte 22h
+        HLT
+
+segment stack
+        resb 16
+        db 14
+dno:    db ?
+n       db 42
+"""
+
+
+    program = assemble(code4)
     print(program)
 
     e = Emulator(program)
