@@ -31,7 +31,7 @@ class Emulator:
 
             "IP": 0,  # Instruction pointer
 
-            "FI": 0  # Flags register
+            "Fl": 0  # Flags register
         }
 
         self.program = program # Seznam bajtů
@@ -96,9 +96,9 @@ class Emulator:
             return
 
         if reg[1] in ["L", "H"]:
-            assert 0 < val < 2**8
+            assert 0 <= val < 2**8
         else:
-            assert 0 < val < 2**16
+            assert 0 <= val < 2**16
 
         self.registers[reg] = val
 
@@ -148,14 +148,16 @@ class Emulator:
 
     # ------- FLAGS: --------
     def set_flag(self, flag: Flag, val: bool):
-        f_reg = self.registers["FI"]
+        f_reg = self.registers["Fl"]
         f_reg = f_reg & ~(1 << flag)  # Make the flag 0
 
         if val:
             f_reg = f_reg | (1 << flag)
+        
+        self.registers["Fl"] = f_reg
 
     def get_flag(self, flag: Flag):
-        f_reg = self.registers["FI"]
+        f_reg = self.registers["Fl"]
         return (f_reg // (2**flag)) % 2
 
     def update_pf(self, result):
@@ -175,7 +177,7 @@ class Emulator:
         self.set_flag(SF, sign == 1)
 
     def update_cf(self, result, opsize):
-        self.set_flag(CF, result > 2**(8*opsize))
+        self.set_flag(CF, result >= 2**opsize)
 
     def update_of(self, result, opsize, numbers: list[int]):
         assert len(numbers) == 2, "Pro výpočet přetečení vložte dvě čísla."
@@ -187,7 +189,7 @@ class Emulator:
         is_overflow = (sign1 == sign2) and (sign1 != sign_res)
         self.set_flag(OF, is_overflow)
     
-    def update_flags(self, result: int, flags: list[int], opsize: int, 
+    def update_flags(self, result: int, opsize: int, flags: list[int], 
                   previous_numbers: list[int] = [] # TODO: Lepší jméno
                   ):
         """Nastaví požadované příznaky. Výsledek vkládejte v přímém kódu s případným přetečením."""
@@ -196,6 +198,8 @@ class Emulator:
         
         if OF in flags:
             self.update_of(result, opsize, previous_numbers)
+        
+        result = result % 2**opsize
 
         if SF in flags:
             self.update_sf(result, opsize)
@@ -417,6 +421,9 @@ segment code
         MOV BX, stack
         MOV DS, BX
         NOP
+        MOV AL, 200
+        MOV AH, 200
+        ADD AL, AH
         NOP
         MOV [dno], byte 22h
         HLT
@@ -428,8 +435,14 @@ dno:    db ?
 n       db 42
 """
 
+    overflwo_test = """
+segment code
+        MOV AL, 255
+        ADD AL, 1
+        HLT
+"""
 
-    program = assemble(code4)
+    program = assemble(overflwo_test)
     print(program)
 
     e = Emulator(program)
