@@ -70,7 +70,9 @@ def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
             continue
 
         if arg[0] == "A":
-            raise NotImplementedError("TODO: dodělat")
+            offset = load_next() + load_next() * 2**8
+            segment = load_next() + load_next() * 2**8
+            instruction.arguments.append(Pointer(segment, offset))
             continue
 
         # From here, all instructions do need ModR/M

@@ -2,7 +2,9 @@ from data import *
 from disassembler import *
 import re
 
+Info = dict[str, None | int | list[int]]
 
+MAX_SEGMENT_SIZE = 2**16
 
 def assemble(code: str) -> list[int]:
     labels = {}
@@ -96,6 +98,7 @@ def assemble(code: str) -> list[int]:
 def bytes_remaining_in_segment(segment_length: int) -> int:
     # TODO: Write something meaningfull
     return 42  # Even tho 42 is an answer to everything, it is not for this.  
+
 
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     line = capitalize_registers(line)
@@ -208,17 +211,19 @@ def matches_args(templates: list[str], args: list[str]):
                 return False
             continue
 
+        if "A" in templ:
+            if "FAR" not in arg:
+                return False
+            continue
+
         # Is an immediate:
-        if templ[0] not in ["I", "J", "A"]:
+        if templ[0] not in ["I", "J"]:
             return False
 
     return True
 
-Template = dict[str, None | int | list[int]]
 
-MAX_SEGMENT_SIZE = 2**16
-
-def convert_to_bytes(args: list[str], parameters: str, info: Template, 
+def convert_to_bytes(args: list[str], parameters: str, info: Info, 
                      labels: dict[str, int], # Hej už se to tu dost množí argumenty - chtělo by to přepracovat :-(
                      curr_instr_idx: int, # TODO: Lepší název
                      labels_segment: dict[str, str] # TODO: Tohle už je cursed. Vymyslet lepší label architecutre
@@ -229,7 +234,6 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
 
     if "opcode" not in info: 
         # Is a DATA instruction (Like DB or RESB)
-
         if info["instruction"][0] == "D": # DB, DW, DD
             for arg in args:
                 if arg == "?":
@@ -266,24 +270,21 @@ def convert_to_bytes(args: list[str], parameters: str, info: Template,
             # Encoded in opcode, no more details needed
             continue
 
-        if "FAR" in arg: # Tohle určitě patří na lepší místo
-            arg = arg.replace("FAR ", "")
-            arg = arg.strip()
-
         match param[0]:
             case "A":
                 if ":" in arg:
                     seg, off = [p.strip() for p in arg.split(":")]
-                    output.extend(int_to_bytes(calculate_value(off, labels), 16))
-                    output.extend(int_to_bytes(calculate_value(seg, labels), 16))
+                    info["data"].extend(int_to_bytes(calculate_value(off, labels), 16))
+                    info["data"].extend(int_to_bytes(calculate_value(seg, labels), 16))
                 else:
                     # FAR JMP/CALL 
+                    arg = arg.replace("FAR ", "")
                     if arg not in labels:
                         if "+" in arg:
                             raise Exception(f"Při FAR JMP/CALL prosím nepoužívejte matematiku. (kdyby něco, pište na DF)")
                     
-                    output.extend(int_to_bytes(labels[arg], 16))
-                    output.extend(int_to_bytes(labels[labels_segment[arg]], 16)) # So cursed
+                    info["data"].extend(int_to_bytes(labels[arg], 16))
+                    info["data"].extend(int_to_bytes(labels[labels_segment[arg]], 16)) # So cursed
                     
             case "J":
                 # Relative offset
@@ -429,93 +430,12 @@ def int_to_bytes(val: int, size: int) -> list[int]:
     return output
 
 if __name__ == "__main__":
-    # print(matches_args(["Ib"], ["42"]))
-    # print(matches_args(["Ev"], ["BX"]))
-    # print(matches_args(["Ev"], ["42"]))
-    # print(matches_args(["Ev"], ["[42]"]))
-    # print(matches_args(["Ev"], ["[BX+42]"]))
-    # print(matches_args(["Gb"], ["AL"]))
-    # print(matches_args(["Gb"], ["SS"]))
-    # print(matches_args(["Gb"], ["34"]))
 
-    # print("OK")
-    # print(calculate_value("42", {}))
-    # print(calculate_value("42+42", {}))
-    # print(calculate_value("42-42", {}))
-    # print(calculate_value("42+42-42", {}))
-    # print(calculate_value("lbl", {"lbl": 42}))
-    # print(calculate_value("lbl+42", {"lbl": 42}))
-    # print(calculate_value("lbl-42", {"lbl": 42}))
-    # print(calculate_value("lbl- 42 + NoTomeUndefined", {"lbl": 42}))
-    # print(matches_args(["3"], ["3"]))
-    # print(matches_args(["Eb", "Gb"], ["AL", "[32]"]))
-    # print(calculate_value("42+23-lbl", {"lbl": 42}))
-    # print(calculate_value("", {"lbl": 42}))
-    # print(matches_args(["AL"], ["AH"]))
-    print(matches_args(["Sw", "Ew"], ["DS", "BX"]))
-
-
-    code = """
+    jmps = """
 segment code
-label   MOV AX, 7
-        MOV BX, 42
-        ADD AX, BX
-        INC AX
-        HLT
-    """
+        JMP FAR dno
 
-    code2 = """
-segment code
-        dec byte [bx+2]
-label   DEC byte [BX+2]
-        MOV AX, label
-
-segment extra_segment
-        MOV AX, 42
-        MOV BX, 42
-        ADD AX, BX
-        INC AX
-        
-"""
-
-    code3 = """
-segment code
-        MOV DS, BX
-"""
-
-    code4 = """
-segment data
-n        DB 42, n, navesti
-navesti dd 42, n
-"""
-
-    code5 = """
-segment code
-        MOV BX, data
-        MOV DS, BX
-        MOV [n], byte 042
-
-segment data
-n       db 42
-x       resb 4
-y       db 0ABh
-"""
-
-    code6 = """
-segment test
-        JMP FAR [BX]
-    
-segment functions
-        resb 42
-label   HLT
-
-"""
-
-    code7 = """
-segment code
-        NOP
-        NOP
-        MOV [dno], byte 22h
+loop_s  MOV AX, 0
         HLT
 
 segment stack
@@ -527,14 +447,18 @@ n       db 42
 
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
-    program = assemble(code7)
+    program = assemble(jmps)
     print(program)
-    # print([hex(b) for b in program if b is not None])
+    print([hex(b) for b in program if b is not None])
 
+    from disassembler import parse_next_instruction
+
+    x = parse_next_instruction(program, 0)
+
+    print(x)
     # assemble("segment code \nllaabel JMP lbl_02")
 
 
-    
     ...
 
 
