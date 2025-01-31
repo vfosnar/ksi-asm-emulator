@@ -627,34 +627,31 @@ nums    db 64
         db 0
 """
 
-    code = """
-segment code
-        MOV BX, data
-        MOV DS, BX
+    brandejs_kostra = """
+segment	code
+..start	mov bx,data
+	mov ds,bx
+	mov bx,stack
+	mov ss,bx
+	mov sp,dno
 
-loop_s  mov AH, 0ah	; Identifikace služby Načíst řádek z terminálu
-        mov DX,nacteno	; Offset začátku bufferu v segmentu dle DS
-        int 21h		; resp. int 33 poskytne službu
+	mov dx,mesg
+	mov ah,9
+	int 21h
+	hlt
 
-        JZ konec
+segment	data
+bajt	db 12h
+slovo	dw 2356h
+mesg	db 'Ahoj','$'
 
-        MOV BX, [nacteno+1]
-        ADD BX, 2
-        MOV [BX], byte 0
+segment	stack
+	resb 16
+dno:	db ?
 
-        mov AH,9	    ; Identifikace služby Vypsat řetězec bajtů na terminál
-        mov DX,zprava	; Offset začátku řetězce v segmentu dle DS
-        int 21h		    ; resp. int 33 poskytne službu
-
-        JMP FAR loop_s
-
-konec   HLT
-
-segment data
-nacteno	db 80, ?
-zprava  resb 80
 """
-    program = assemble(code)
+
+    program = assemble(brandejs_kostra)
     print(program)
 
     e = Emulator(program)

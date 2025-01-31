@@ -131,6 +131,7 @@ INSTRUCTIONS_WITHOUT_PARAMETER = {"DAA", "DAS", "AAA", "AAS", "NOP", "CBW", "CWD
 
 DATA_INSTRUCTIONS = {"DB", "DW", "DD", "RESB", "RESW", "RESD"}
 
+STRING_QUOTES = ['"', "'"]
 
 # Flags
 Flag = int

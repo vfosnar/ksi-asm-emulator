@@ -20,6 +20,8 @@ def assemble(code: str) -> list[int]:
     # Pls keep enumberate for error line info (W.I.P.)
     for i, line in enumerate(code.split("\n")):
         line = re.sub(r'\s+', ' ', line)  # Make all whitespace one space
+        line = line.replace("'$'", '0')
+        line = line.replace('"$"', '0')
 
         if line.strip() == "":
             continue
@@ -55,7 +57,17 @@ def assemble(code: str) -> list[int]:
                     size = 32
 
             if instr[0] == "D":
+                expected_length = 0
+                updated_args = []
+                for arg in args:
+                    if arg[0] in STRING_QUOTES and arg[-1] in STRING_QUOTES:
+                        updated_args.extend(convert_string_arg_to_numbers(arg))
+                    else:
+                        updated_args.append(arg)
+
+                args = updated_args
                 expected_length = len(args) * (size // 8)
+
             elif "RES" in instr:
                 # Tady snad nikdo nebude dávat návěští. Hlavně delku potřebuju vědět už tu.
                 expected_length = calculate_value(args[0], {}) * (size // 8)
@@ -65,7 +77,7 @@ def assemble(code: str) -> list[int]:
                     "size": size,
                     "instruction": instr
                     }
-            # Code duplicity
+            # Code triplicity
             segments_templates[-1].append(("skip", args, info))
 
         else:
@@ -76,7 +88,7 @@ def assemble(code: str) -> list[int]:
             for instr_params, info in possible_codes:
                 if matches_args(instr_params.split(" "), args):
                     info = info.copy()
-                    # Code duplicity
+                    # Code triplicity
                     segments_templates[-1].append((instr_params, args, info))
                     break
             else:
@@ -110,6 +122,11 @@ def assemble(code: str) -> list[int]:
 def bytes_remaining_in_segment(segment_length: int) -> int:
     # TODO: Write something meaningfull
     return 42  # Even tho 42 is an answer to everything, it is not for this.
+
+
+def convert_string_arg_to_numbers(arg: str) -> list[str]:
+    assert arg[0] in STRING_QUOTES and arg[-1] in STRING_QUOTES
+    return [str(ord(c)) for c in arg[1:-1]]
 
 
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
@@ -251,7 +268,6 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
         if info["instruction"][0] == "D":  # DB, DW, DD
             for arg in args:
                 if arg == "?":
-
                     output.extend([None] * (info["size"] // 8))
                 else:
                     val = calculate_value(arg, labels)
@@ -419,7 +435,7 @@ def calculate_value(arg: str, labels: dict[str, int]) -> int | None:
 
         part_val = 0
 
-        if part[0].isdigit():
+        if part[0].isdigit() or part[0] in "'\"":
             part_val = parse_number(part)
         else:
             assert part in labels, f"Label \"{part}\" is not defined"
@@ -434,6 +450,15 @@ def parse_number(s: str) -> int:
     # Parses sum of numbers and works with hex and binary
     # Like: "3+4" -> 7
     # "0Fh+4" -> 19
+    if s[0] in "\"'" and s[-1] in "\"'":
+        value = 0
+        for i in range(1, len(s)-1):
+            byte_val = ord(s[i])
+            assert 0 <= byte_val <= 256, f"Invalid character \"{s[i]}\""
+
+            value *= 256
+        return value
+
     if s[-1] == "h":
         return int(s[:-1], 16)
     if s[-1] == "b":
@@ -472,13 +497,19 @@ dno:    db ?
 n       db 42
 """
 
+    code2 = """
+segment code
+    db 'hello', 15, 'world'
+    dw 'hello', "world"
+"""
+
     # program = assemble("segment code \nllaabel ADD AX, BX")
-    program = assemble(jmps)
+    program = assemble(code2)
     print(program)
     print([hex(b) for b in program if b is not None])
 
-    from disassembler import parse_next_instruction
+    # from disassembler import parse_next_instruction
 
-    x = parse_next_instruction(program, 0)
+    # x = parse_next_instruction(program, 0)
 
-    print(x)
+    # print(x)
