@@ -47,6 +47,8 @@ def assemble(code: str) -> list[int]:
             # Bolí mě z toho oči, ale nestíhám. TODO: Přepsat
             labels_segment[label] = segment
 
+        has_prefix = contains_prefix(line)
+
         if instr in DATA_INSTRUCTIONS:
             match instr[-1]:
                 case "B":
@@ -94,6 +96,9 @@ def assemble(code: str) -> list[int]:
             else:
                 raise Exception(f"Invalid arguments for instruction {instr}")
 
+        if has_prefix:
+            info["expected_length"] += 1
+
         segment_length += info["expected_length"]
         total_length += info["expected_length"]
 
@@ -117,6 +122,13 @@ def assemble(code: str) -> list[int]:
         bytecode.extend(segment_bytecode)
 
     return bytecode
+
+
+def contains_prefix(line: str) -> bool:
+    for prefix in PREFIXES:
+        if prefix in line:
+            return True
+    return False
 
 
 def bytes_remaining_in_segment(segment_length: int) -> int:

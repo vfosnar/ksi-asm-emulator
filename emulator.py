@@ -634,6 +634,11 @@ segment	code
 	mov bx,stack
 	mov ss,bx
 	mov sp,dno
+    MOV BX, muj_stack
+    MOV ES, BX
+
+    MOV AX, 7
+    MOV ES:[1], AX
 
 	mov dx,mesg
 	mov ah,9
@@ -648,6 +653,10 @@ mesg	db 'Ahoj','$'
 segment	stack
 	resb 16
 dno:	db ?
+
+segment muj_stack
+    db 123
+    resb 16
 
 """
 
