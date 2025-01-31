@@ -1,10 +1,12 @@
 from data import *
 from disassembler import *
 import re
+from converting_functions import *
 
 Info = dict[str, None | int | list[int]]
 
 MAX_SEGMENT_SIZE = 2**16
+
 
 def assemble(code: str) -> list[int]:
     labels = {}
@@ -15,16 +17,19 @@ def assemble(code: str) -> list[int]:
     segments_templates = []
     labels_segment = {}
 
-    for i, line in enumerate(code.split("\n")):  # Pls keep enumberate for error line info (W.I.P.)
+    # Pls keep enumberate for error line info (W.I.P.)
+    for i, line in enumerate(code.split("\n")):
         line = re.sub(r'\s+', ' ', line)  # Make all whitespace one space
 
         if line.strip() == "":
             continue
 
+        print(f"line: {i} | byte: {total_length}: {line}")
+
         if line.startswith("segment"):
             if segment_length != 0:
                 total_length += bytes_remaining_in_segment(segment_length)
-        
+
             segment = line.split(" ")[1]
             segment_length = 0
             labels[segment] = total_length
@@ -35,9 +40,10 @@ def assemble(code: str) -> list[int]:
         label, instr, args = parse_line_parts(line)
 
         if label != "":
-            label = label.replace(":", "")  
+            label = label.replace(":", "")
             labels[label] = segment_length
-            labels_segment[label] = segment # Bolí mě z toho oči, ale nestíhám. TODO: Přepsat
+            # Bolí mě z toho oči, ale nestíhám. TODO: Přepsat
+            labels_segment[label] = segment
 
         if instr in DATA_INSTRUCTIONS:
             match instr[-1]:
@@ -49,15 +55,18 @@ def assemble(code: str) -> list[int]:
                     size = 32
 
             if instr[0] == "D":
-                expected_length = len(args) * (size // 8) 
+                expected_length = len(args) * (size // 8)
             elif "RES" in instr:
-                expected_length = calculate_value(args[0], {}) * (size // 8) # Tady snad nikdo nebude dávat návěští. Hlavně delku potřebuju vědět už tu.
-                
-            info = {"expected_length": expected_length, 
-                    "size": size, # This is so cursed (ale nestíhám, takže to budeš muset přežít)
+                # Tady snad nikdo nebude dávat návěští. Hlavně delku potřebuju vědět už tu.
+                expected_length = calculate_value(args[0], {}) * (size // 8)
+
+            info = {"expected_length": expected_length,
+                    # This is so cursed (ale nestíhám, takže to budeš muset přežít)
+                    "size": size,
                     "instruction": instr
-            }
-            segments_templates[-1].append(("skip", args, info))  # Code duplicity
+                    }
+            # Code duplicity
+            segments_templates[-1].append(("skip", args, info))
 
         else:
             size = get_instruction_size(instr, args)
@@ -67,7 +76,8 @@ def assemble(code: str) -> list[int]:
             for instr_params, info in possible_codes:
                 if matches_args(instr_params.split(" "), args):
                     info = info.copy()
-                    segments_templates[-1].append((instr_params, args, info))  # Code duplicity
+                    # Code duplicity
+                    segments_templates[-1].append((instr_params, args, info))
                     break
             else:
                 raise Exception(f"Invalid arguments for instruction {instr}")
@@ -80,16 +90,18 @@ def assemble(code: str) -> list[int]:
     for templates in segments_templates:
         segment_bytecode = []
         for params, args, info in templates:
-            bytes = convert_to_bytes(args, params, info, labels, len(bytecode), labels_segment)
+            bytes = convert_to_bytes(args, params, info, labels, len(
+                segment_bytecode), labels_segment)
 
             if len(bytes) != info["expected_length"]:
                 # 844 - random number, kdybych někde jinde přidával stejnou message
-                raise Exception(f"Chyba emulátoru. Prosím napiš na Diskusní fórum úlohy. (ErrCode: 844 - neočekávaný počet bajtů)") 
-            
-            segment_bytecode.extend(bytes)
-        
+                raise Exception(
+                    f"Chyba emulátoru. Prosím napiš na Diskusní fórum úlohy. (ErrCode: 844 - neočekávaný počet bajtů)")
 
-        segment_bytecode.extend([None for _ in range(bytes_remaining_in_segment(len(segment_bytecode)))])
+            segment_bytecode.extend(bytes)
+
+        segment_bytecode.extend([None for _ in range(
+            bytes_remaining_in_segment(len(segment_bytecode)))])
         bytecode.extend(segment_bytecode)
 
     return bytecode
@@ -97,7 +109,7 @@ def assemble(code: str) -> list[int]:
 
 def bytes_remaining_in_segment(segment_length: int) -> int:
     # TODO: Write something meaningfull
-    return 42  # Even tho 42 is an answer to everything, it is not for this.  
+    return 42  # Even tho 42 is an answer to everything, it is not for this.
 
 
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
@@ -126,10 +138,10 @@ def get_instruction_size(instruction: str, args: list[str]) -> int:
     """Returns 0/8/16"""
     if instruction in INSTRUCTIONS_WITHOUT_PARAMETER or instruction in DATA_INSTRUCTIONS:
         return 0
-    
-    if instruction == "INT": # Hnusný hardcode, ale zjistil jsem to pozdě
+
+    if instruction == "INT":  # Hnusný hardcode, ale zjistil jsem to pozdě
         return 0 if args[0] == "3" else 8
-    
+
     if instruction in ["JMP", "CALL"]:
         if "SHORT" in args[0]:
             return 8
@@ -190,7 +202,7 @@ def matches_args(templates: list[str], args: list[str]):
 
         if templ in REGISTERS:
             if arg != templ:
-                return False 
+                return False
             continue
 
         # TODO: Tohle vypadá tak strašně. Acho jo. Musím to přepsat
@@ -223,29 +235,31 @@ def matches_args(templates: list[str], args: list[str]):
     return True
 
 
-def convert_to_bytes(args: list[str], parameters: str, info: Info, 
-                     labels: dict[str, int], # Hej už se to tu dost množí argumenty - chtělo by to přepracovat :-(
-                     curr_instr_idx: int, # TODO: Lepší název
-                     labels_segment: dict[str, str] # TODO: Tohle už je cursed. Vymyslet lepší label architecutre
+def convert_to_bytes(args: list[str], parameters: str, info: Info,
+                     # Hej už se to tu dost množí argumenty - chtělo by to přepracovat :-(
+                     labels: dict[str, int],
+                     curr_instr_idx: int,  # TODO: Lepší název
+                     # TODO: Tohle už je cursed. Vymyslet lepší label architecutre
+                     labels_segment: dict[str, str]
                      ) -> list[int]:
     """Converts instruction to bytecode."""
     # ! NOT TESTED !
     output = []
 
-    if "opcode" not in info: 
+    if "opcode" not in info:
         # Is a DATA instruction (Like DB or RESB)
-        if info["instruction"][0] == "D": # DB, DW, DD
+        if info["instruction"][0] == "D":  # DB, DW, DD
             for arg in args:
                 if arg == "?":
 
                     output.extend([None] * (info["size"] // 8))
-                else: 
+                else:
                     val = calculate_value(arg, labels)
                     output.extend(int_to_bytes(val, info["size"]))
 
         elif info["instruction"][0] == "R":  # RESB, RESW, RESD
             output.extend([None] * info["expected_length"])
-            
+
         return output
 
     # --- 1) Vyplnit celé info
@@ -274,24 +288,33 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
             case "A":
                 if ":" in arg:
                     seg, off = [p.strip() for p in arg.split(":")]
-                    info["data"].extend(int_to_bytes(calculate_value(off, labels), 16))
-                    info["data"].extend(int_to_bytes(calculate_value(seg, labels), 16))
+                    info["data"].extend(int_to_bytes(
+                        calculate_value(off, labels), 16))
+                    info["data"].extend(int_to_bytes(
+                        calculate_value(seg, labels), 16))
                 else:
-                    # FAR JMP/CALL 
+                    # FAR JMP/CALL
                     arg = arg.replace("FAR ", "")
                     if arg not in labels:
                         if "+" in arg:
-                            raise Exception(f"Při FAR JMP/CALL prosím nepoužívejte matematiku. (kdyby něco, pište na DF)")
-                    
+                            raise Exception(
+                                f"Při FAR JMP/CALL prosím nepoužívejte matematiku. (kdyby něco, pište na DF)")
+
                     info["data"].extend(int_to_bytes(labels[arg], 16))
-                    info["data"].extend(int_to_bytes(labels[labels_segment[arg]], 16)) # So cursed
-                    
+                    info["data"].extend(int_to_bytes(
+                        labels[labels_segment[arg]], 16))  # So cursed
+
             case "J":
                 # Relative offset
                 # Calculate distance, assert distance < 2**x
-                desitny = calculate_value(arg, labels)
-                dist = desitny - curr_instr_idx
                 size = 8 if param[1] == "b" else 16
+
+                desitny = calculate_value(arg, labels)
+                dist = desitny - curr_instr_idx - info["expected_length"]
+                assert -2**(size-1) <= dist < 2**(size -
+                                                  1), f"Relative jump too far: {dist}"
+                dist = to_twos_complement(
+                    desitny - curr_instr_idx - info["expected_length"], size)
                 bytes = int_to_bytes(dist, size)
                 info["data"].extend(bytes)
 
@@ -305,19 +328,20 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
                 if param[1] == "b":
                     reg_val = RM_8_REGS.index(arg)
                 else:
-                    reg_val = RM_16_REGS.index(arg) 
+                    reg_val = RM_16_REGS.index(arg)
 
-                if "modrm" not in info: # Code triplicity
+                if "modrm" not in info:  # Code triplicity
                     info["modrm"] = 0
 
-                info["modrm"] += reg_val *8  # Reg part of modrm
+                info["modrm"] += reg_val * 8  # Reg part of modrm
 
             case "E":
-                if "modrm" not in info: # Code triplicity
+                if "modrm" not in info:  # Code triplicity
                     info["modrm"] = 0
 
                 rm_val, mod_val = 0, 0
-                is_special = False  # if mod=00 and rm=110 (only 16 displacement)
+                # if mod=00 and rm=110 (only 16 displacement)
+                is_special = False
                 if arg[0] == "[" and arg[-1] == "]":
                     # Assert arg is without prefix
                     arg = arg[1:-1]
@@ -329,7 +353,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
                             break
                     else:
                         is_special = True
-                        rm_val = 6 # Only displacement - protože prostě někdo si řelk, jo, tohle je dobrý nápad. viz tabulka
+                        rm_val = 6  # Only displacement - protože prostě někdo si řelk, jo, tohle je dobrý nápad. viz tabulka
 
                     if arg != "":
                         displ = calculate_value(arg, labels)
@@ -340,9 +364,8 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
                         else:
                             info["data"].extend(int_to_bytes(displ, 16))
 
-
                 else:
-                    mod_val = 3  # Selects register 
+                    mod_val = 3  # Selects register
                     if param[1] == "b":
                         rm_val = RM_8_REGS.index(arg)
                     else:
@@ -351,22 +374,21 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
                 info["modrm"] += rm_val
                 info["modrm"] += mod_val * 64
 
-                
             case "S":
                 # Segment register
-                if "modrm" not in info: # Code triplicity
+                if "modrm" not in info:  # Code triplicity
                     info["modrm"] = 0
                 reg_val = SEG_REGS.index(arg)
                 info["modrm"] += reg_val * 8
                 # ? Snad je to správně
 
     if "E" in "".join(parameters):
-        to_fill = info["expected_length"] - len(info["data"]) - (1 if "prefix" in info else 0) - (1 if "modrm" in info else 0) - 1
+        to_fill = info["expected_length"] - len(info["data"]) - (
+            1 if "prefix" in info else 0) - (1 if "modrm" in info else 0) - 1
         info["data"].extend([0x90] * to_fill)
-    # 1) Register / Memmory (=> ModR/M + možný displacement - taky podle toho upravid Mod) 
+    # 1) Register / Memmory (=> ModR/M + možný displacement - taky podle toho upravid Mod)
     # 2) Ap (pointer) -> uložit segment a offset
     # 3) I (immediate) -> uložit hodnotu
-
 
     # --- 2) Předělat info na bytecode
     if "prefix" in info and info["prefix"] is not None:
@@ -384,11 +406,11 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
 
 def calculate_value(arg: str, labels: dict[str, int]) -> int | None:
     """Returns the value of the argument."""
-    parts = re.split(r"(?=[+-])", arg) # Splits by + and -, but keeps it in
+    parts = re.split(r"(?=[+-])", arg)  # Splits by + and -, but keeps it in
     runnung_sum = 0
 
     for part in parts:
-        if part == "":
+        if part == "" or part == "+":
             continue
 
         sign = "-" if part[0] == "-" else "+"
@@ -421,6 +443,9 @@ def parse_number(s: str) -> int:
 
 def int_to_bytes(val: int, size: int) -> list[int]:
     """Returns list of bytes, of the number in little endian."""
+    if val < 0:
+        val += 2**size
+
     output = []
 
     for _ in range(size // 8):
@@ -428,6 +453,7 @@ def int_to_bytes(val: int, size: int) -> list[int]:
         val //= 2**8
 
     return output
+
 
 if __name__ == "__main__":
 
@@ -445,7 +471,6 @@ segment stack
 dno:    db ?
 n       db 42
 """
-
 
     # program = assemble("segment code \nllaabel ADD AX, BX")
     program = assemble(jmps)

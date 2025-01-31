@@ -125,14 +125,49 @@ GRPs = {
     "GRP5": [('INC', ''), ('DEC', ''), ('CALL', ''), ('CALL', 'Mp'), ('JMP', ''), ('JMP', 'Mp'), ('PUSH', ''), ('--', '')]
 }
 
-INSTRUCTIONS_WITHOUT_PARAMETER = {"DAA", "DAS","AAA","AAS","NOP","CBW","CWD","WAIT","PUSHF","POPF","SAHF","LAHF","MOVSB","MOVSW",
-                                  "CMPSB","CMPSW","STOSB","STOSW","LODSB","LODSW","SCASB","SCASW","RET","RETF","INTO","IRET","XLAT",
-                                  "LOCK","REPNZ","REPZ","HLT","CMC","CLC","STC","CLI","STI","CLD","STD"}
+INSTRUCTIONS_WITHOUT_PARAMETER = {"DAA", "DAS", "AAA", "AAS", "NOP", "CBW", "CWD", "WAIT", "PUSHF", "POPF", "SAHF", "LAHF", "MOVSB", "MOVSW",
+                                  "CMPSB", "CMPSW", "STOSB", "STOSW", "LODSB", "LODSW", "SCASB", "SCASW", "RET", "RETF", "INTO", "IRET", "XLAT",
+                                  "LOCK", "REPNZ", "REPZ", "HLT", "CMC", "CLC", "STC", "CLI", "STI", "CLD", "STD"}
 
 DATA_INSTRUCTIONS = {"DB", "DW", "DD", "RESB", "RESW", "RESD"}
 
 
-INSTRUCTIONS_v2 ={
+# Flags
+Flag = int
+CF, PF, ZF, SF, OF = 0, 2, 6, 7, 11
+
+SIMPLE_CONDITION_JMPS = {
+    'JE': [(ZF, 1)],
+    'JZ': [(ZF, 1)],
+    'JNE': [(ZF, 0)],
+    'JNZ': [(ZF, 0)],
+    'JP': [(PF, 1)],
+    'JPE': [(PF, 1)],
+    'JNP': [(PF, 0)],
+    'JPO': [(PF, 0)],
+    'JS': [(SF, 1)],
+    'JNS': [(SF, 0)],
+    'JC': [(CF, 1)],
+    'JNC': [(CF, 0)],
+    'JO': [(OF, 1)],
+    'JNO': [(OF, 0)],
+    'JB': [(CF, 1)],
+    'JNAE': [(CF, 1)],
+    'JA': [(CF, 0), (ZF, 0)],
+    'JNBE': [(CF, 0), (ZF, 0)],
+    'JBE': [(CF, 1), (ZF, 1)],
+    'JNA': [(CF, 1), (ZF, 1)],
+    'JAE': [(CF, 0)],
+    'JNB': [(CF, 0)],
+    # Ještě chybí JL, JNGE, JG, JNLE, JLE, JNG, JGE, JNL
+    # ty se ale nedají definovat jednoduchou podmínkou
+}
+
+# For filling the instructions dictionary
+MISSING_CONDITION_JMPS = ['JL', 'JNGE',
+                          'JG', 'JNLE', 'JLE', 'JNG', 'JGE', 'JNL']
+
+INSTRUCTIONS_v2 = {
     "ADD8": [
         ("Eb Gb", {"opcode": 0, "expected_length": 4}),
         ("Gb Eb", {"opcode": 2, "expected_length": 4}),
@@ -519,5 +554,3 @@ INSTRUCTIONS_v2 ={
     "IDIV8": [("Eb", {"opcode": 246, "modrm": 56, "expected_length": 5})],
     "IDIV16": [("Ev", {"opcode": 247, "modrm": 56, "expected_length": 6})],
 }
-
-

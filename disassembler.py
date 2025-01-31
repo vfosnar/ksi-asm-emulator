@@ -9,7 +9,7 @@ def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
     def load_next():
         nonlocal span
         byte = program[IP + span]
-        assert byte is not None, "Snaha načíst nedefinovaný byte jako instrukci"
+        assert byte is not None, "Načítáte nedefinovaný bit jako instrukci. Nezapoměli jste HLT??"
         span += 1
         instruction.bytes.append(byte)
         return byte
