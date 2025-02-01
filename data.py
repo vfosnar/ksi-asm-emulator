@@ -357,12 +357,12 @@ INSTRUCTIONS_v2 = {
     "TEST8": [
         ("Gb Eb", {"opcode": 132, "expected_length": 4}),
         ("AL Ib", {"opcode": 168, "expected_length": 2}),
-        ("Eb", {"opcode": 246, "modrm": 0, "expected_length": 5}),
+        ("Eb Ib", {"opcode": 246, "modrm": 0, "expected_length": 5}),
     ],
     "TEST16": [
         ("Gv Ev", {"opcode": 133, "expected_length": 4}),
         ("AX Iv", {"opcode": 169, "expected_length": 3}),
-        ("Ev", {"opcode": 247, "modrm": 0, "expected_length": 6}),
+        ("Ev Iv", {"opcode": 247, "modrm": 0, "expected_length": 6}),
     ],
     "XCHG8": [("Gb Eb", {"opcode": 134, "expected_length": 4})],
     "XCHG16": [
