@@ -86,8 +86,8 @@ def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
                 instruction.arguments.append(instruction.modrm.reg)
             case "E":
                 rm = instruction.modrm.rm
-                if isinstance(rm, Memmory):
-                    # To remove : from for ex. "ES:"
+                if isinstance(rm, Memmory) and instruction.prefix is not None:
+                    # To remove ":" from for ex. "ES:"
                     rm.segment = instruction.prefix[:-1]
                 instruction.arguments.append(rm)
             case "S":

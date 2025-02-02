@@ -5,7 +5,7 @@ from converting_functions import *
 
 class Emulator:
 
-    def __init__(self, program):
+    def __init__(self, program, start: tuple[int, int] = (0, 0), lines_info: list[tuple[int, str]] = []):
         self.instructions_counter = 0
         self.MAX_INSTRUCTIONS = 10_000
 
@@ -24,14 +24,14 @@ class Emulator:
 
             "SP": None,  # Stack pointer
 
-            "CS": 0,  # Code segment
+            "CS": start[0],  # Code segment
             "DS": None,  # Data segment
             "SS": None,  # Stack segment
             "ES": None,  # Extra segment
 
-            "IP": 0,  # Instruction pointer
+            "IP": start[1],  # Instruction pointer
 
-            "Fl": 0  # Flags register
+            "FL": 0  # Flags register
         }
 
         self.program = program  # Seznam bajtů
@@ -45,13 +45,16 @@ class Emulator:
             "HLT": self.HLT, "CMP": self.CMP, "TEST": self.TEST,
             "JMP": self.JMP, "CALL": self.CALL, "PUSH": self.PUSH,
             "POP": self.POP, "RET": self.RET, "RETF": self.RETF,
-            "INT": self.INT
+            "INT": self.INT, "TST": self.TEST, "DIV": self.DIV,
+            "IDIV": self.IDIV, "IRET": self.IRET, "CBW": self.CBW,
         }
 
         self.console_input: str = "Hello\nworld\n"
         self.console_output: str = ""
 
         self._complete_instruction_dictionary()
+
+        self.lines_info = lines_info
 
     def run(self):
         while self.running:
@@ -66,8 +69,12 @@ class Emulator:
                 self.get_register("CS") + self.registers["IP"]
             )
 
-            print(
-                f"IP: [{self.registers['CS']}:{self.registers['IP']}], instr: {instr.operation}")
+            possible_line = self.lines_info.get(
+                self.get_register("CS") + self.registers["IP"])
+
+            if not (instr.operation == "NOP" and possible_line is None):
+                print(
+                    f"Abs address: [{self.registers['CS'] + self.registers['IP']}], instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
 
             if instr.operation not in self.instr_methods:
                 raise Exception(
@@ -128,8 +135,12 @@ class Emulator:
         self.registers[reg] = val
 
     def get_byte(self, segment, offset):
-        seg_val = self.get_register(segment)
+        if segment == "ABS":
+            seg_val = 0
+        else:
+            seg_val = self.get_register(segment)
         val = self.program[seg_val + offset]
+
         assert val is not None, f"Trying to get value of undefined byte at {segment + offset}."
         return val
 
@@ -173,16 +184,16 @@ class Emulator:
 
     # ------- FLAGS: --------
     def set_flag(self, flag: Flag, val: bool):
-        f_reg = self.registers["Fl"]
+        f_reg = self.registers["FL"]
         f_reg = f_reg & ~(1 << flag)  # Make the flag 0
 
         if val:
             f_reg = f_reg | (1 << flag)
 
-        self.registers["Fl"] = f_reg
+        self.registers["FL"] = f_reg
 
-    def get_flag(self, flag: Flag):
-        return (self.registers["Fl"] // (2**flag)) % 2
+    def get_flag(self, flag: Flag) -> int:
+        return (self.registers["FL"] // (2**flag)) % 2
 
     def update_pf(self, result):
         counter = 0
@@ -203,14 +214,9 @@ class Emulator:
     def update_cf(self, result, opsize):
         self.set_flag(CF, result >= 2**opsize)
 
-    def update_of(self, result, opsize, numbers: list[int]):
-        assert len(numbers) == 2, "Pro výpočet přetečení vložte dvě čísla."
-
-        sign1 = get_bit(numbers[0], opsize - 1)
-        sign2 = get_bit(numbers[1], opsize - 1)
-        sign_res = get_bit(result, opsize - 1)
-
-        is_overflow = (sign1 == sign2) and (sign1 != sign_res)
+    def update_of(self, result, opsize):
+        """TAKES AS ARGUMENT SIGNED RESULT"""
+        is_overflow = 2**(opsize - 1) <= result < 2**(opsize - 1)
         self.set_flag(OF, is_overflow)
 
     def update_flags(self, result: int, opsize: int, flags: list[int],
@@ -223,6 +229,7 @@ class Emulator:
             self.update_cf(result, opsize)
 
         if OF in flags:
+            raise Exception("Err code: 875. Prosím napiš na diskustní fórum.")
             self.update_of(result, opsize, previous_numbers)
 
         if SF in flags:
@@ -242,83 +249,178 @@ class Emulator:
         self.set_value(instruction.arguments[0], to_insert, instruction.size)
         # MOV Nenastavouje příznaky
 
-    # ------- ARITMETIC INSTRUCTION: --------
+    # ------- ARITMETIC INSTRUCTIONS: --------
     def ADD(self, instruction: Instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
 
         result = val1 + val2
+        signed_result = from_twos_complement(val1, instruction.size) + \
+            from_twos_complement(val2, instruction.size)
+
+        if result > 2**instruction.size:
+            self.set_flag(CF, 1)
+            result = result % 2**instruction.size
+
+        if 2**(instruction.size - 1) <= signed_result < 2**instruction.size:
+            self.set_flag(OF, 1)
 
         self.set_value(instruction.arguments[0], result % (
             2**instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [
-                          OF, CF, ZF, PF, SF], [val1, val2])
+        self.update_flags(result, instruction.size, [ZF, PF, SF])
 
     def ADC(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         cf = 1 if self.get_flag(CF) else 0
+
         result = val1 + val2 + cf
+        signed_result = from_twos_complement(val1, instruction.size) + \
+            from_twos_complement(val2, instruction.size) + cf
 
         self.set_value(instruction.arguments[0], result % (
             2**instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [
-                          OF, CF, ZF, PF, SF], [val1, val2])
+
+        self.update_of(signed_result, instruction.size)
+        self.update_cf(result, instruction.size)
+        self.update_flags(result, instruction.size, [ZF, PF, SF])
 
     def SUB(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
+
         result = val1 - val2
+        signed_result = from_twos_complement(val1, instruction.size) - \
+            from_twos_complement(val2, instruction.size)
 
         self.set_value(
             instruction.arguments[0], result % 2**(instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [
-                          OF, CF, ZF, PF, SF], [val1, val2])
+        self.update_of(signed_result, instruction.size)
+        self.update_cf(result, instruction.size)
+        self.update_flags(result, instruction.size, [ZF, PF, SF])
 
     def SBB(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         cf = 1 if self.get_flag(CF) else 0
+
         result = val1 - val2 - cf
+        signed_result = from_twos_complement(val1, instruction.size) - \
+            from_twos_complement(val2, instruction.size) - cf
 
         self.set_value(
             instruction.arguments[0], result % 2**(instruction.size), instruction.size)
-        self.update_flags(result, instruction.size, [
-                          OF, CF, ZF, PF, SF], [val1, val2])
+        self.update_of(signed_result, instruction.size)
+        self.update_cf(result, instruction.size)
+        self.update_flags(result, instruction.size, [ZF, PF, SF])
 
     def INC(self, instruction):
-        val = self.get_value(instruction.arguments[0]) + 1
-        self.set_value(instruction.arguments[0], val % (
+        val = self.get_value(instruction.arguments[0])
+        result = val + 1
+        signed_result = from_twos_complement(val, instruction.size) + 1
+
+        self.set_value(instruction.arguments[0], result % (
             2**instruction.size), instruction.size)
-        self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
+
+        self.update_of(signed_result, instruction.size)
+        # CF se nemění
+        self.update_flags(val, instruction.size, [ZF, PF, SF])
 
     def DEC(self, instruction):
-        val = self.get_value(instruction.arguments[0]) - 1
-        self.set_value(instruction.arguments[0], val % (
+        val = self.get_value(instruction.arguments[0])
+        result = val - 1
+        signed_result = from_twos_complement(val, instruction.size) - 1
+
+        self.set_value(instruction.arguments[0], result % (
             2**instruction.size), instruction.size)
-        self.update_flags(val, instruction.size, [
-                          OF, CF, ZF, PF, SF], [val + 1, 1])
+
+        self.update_of(signed_result, instruction.size)
+        # CF se nemění
+        self.update_flags(val, instruction.size, [ZF, PF, SF])
 
     def NEG(self, instruction):
         val = self.get_value(instruction.arguments[0])
         val = ~val + 1
         self.set_value(instruction.arguments[0], val % (
             2**instruction.size), instruction.size)
-        self.update_flags(val, instruction.size, [OF, CF, ZF, PF, SF])
+        self.update_flags(val, instruction.size, [ZF, PF, SF])
 
     def MUL(self, instruction):
-        pass
+        val = self.get_register("AX" if instruction.size == 16 else "AL")
+        val *= self.get_value(instruction.arguments[0])
+
+        self.set_value(Register("AX"), val % 2**16, 16)
+        if instruction.size == 16:
+            self.set_value(Register("DX"), (val // 2**16) % 2**16, 16)
 
     def IMUL(self, instruction):
-        pass
+        val = from_twos_complement(self.get_register(
+            "AX" if instruction.size == 16 else "AL"), instruction.size)
+        val *= from_twos_complement(
+            self.get_value(instruction.arguments[0]), instruction.size)
+
+        res = to_twos_complement(val, instruction.size)
+        self.set_value(Register("AX"), res % 2**16, 16)
+        if instruction.size == 16:
+            self.set_value(Register("DX"), (res // 2**16) % 2**16, 16)
 
     def DIV(self, instruction):
-        pass
+        val = 0
+        if instruction.size == 8:
+            val = self.get_register("AX")
+        else:
+            val = self.get_register("DX") * 2**16 + self.get_register("AX")
+
+        divisor = self.get_value(instruction.arguments[0])
+
+        if divisor == 0:
+            instr = Instruction()
+            instr.operation = "INT"
+            instr.arguments = [Immutable(0)]
+            self.INT(instr)
+            return
+
+        result = val // divisor
+        remainder = val % divisor
+
+        if instruction.size == 8:
+            self.set_value(Register("AL"), result, 8)
+            self.set_value(Register("AH"), remainder, 8)
+        else:
+            self.set_value(Register("AX"), result, 16)
+            self.set_value(Register("DX"), remainder, 16)
 
     def IDIV(self, instruction):
-        pass
+        val = 0
+        if instruction.size == 8:
+            val = from_twos_complement(self.get_register("AX"), 16)
+        else:
+            val = from_twos_complement(self.get_register(
+                "DX") * 2**16 + self.get_register("AX"), 16)
+
+        divisor = self.get_value(instruction.arguments[0])
+
+        if divisor == 0:
+            instr = Instruction()
+            instr.operation = "INT"
+            instr.arguments = [Immutable(0)]
+            self.INT(instr)
+            return
+
+        result = from_twos_complement(val, instruction.size) // \
+            from_twos_complement(divisor, instruction.size)
+        remainder = from_twos_complement(val, instruction.size) % \
+            from_twos_complement(divisor, instruction.size)
+
+        if instruction.size == 8:
+            self.set_value(Register("AL"), result, 8)
+            self.set_value(Register("AH"), remainder, 8)
+        else:
+            self.set_value(Register("AX"), result, 16)
+            self.set_value(Register("DX"), remainder, 16)
 
     # ------- LOGIC INSTRUCTIONS: --------
+
     def AND(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
@@ -356,24 +458,30 @@ class Emulator:
         # Nemění příznaky
 
     def CBW(self, instruction):
-        pass
+        val = self.get_register("AL")
+        self.set_register("AH", 0 if val < 2**7 else 0xFF)
 
-    # ------- COMPARING INSTRUCTIONS: --------
+        # ------- COMPARING INSTRUCTIONS: --------
+
     def CMP(self, instruction):
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
-        result = val1 - val2
 
-        self.update_flags(result, instruction.size, [
-                          OF, CF, ZF, PF, SF], [val1, val2])
+        result = val1 - val2
+        signed_result = from_twos_complement(val1, instruction.size) - \
+            from_twos_complement(val2, instruction.size)
+
+        self.update_of(signed_result, instruction.size)
+        self.update_flags(result, instruction.size, [CF, ZF, PF, SF])
 
     def TEST(self, instruction):
-        # And, akorát se neukládá. Jen nastavuje příznaky (flags)
         val1 = self.get_value(instruction.arguments[0])
         val2 = self.get_value(instruction.arguments[1])
         result = val1 & val2
 
         self.update_flags(result, instruction.size, [ZF, PF, SF])
+        self.set_flag(CF, 0)
+        self.set_flag(OF, 0)
 
     # ------- PROGRAM BRANCHING INSTRUCTIONS: --------
     def JMP(self, instruction):
@@ -489,10 +597,28 @@ class Emulator:
     # ------- INTERUPT INSTRUCTIONS: --------
 
     def INT(self, instruction):
-        # Handle interupt
-        # TODO: Handling vlastního vektoru přerušení
         if instruction.arguments[0].value == 0x21:
             self.INT21h(instruction)
+            return
+
+        instr = Instruction()
+        instr.operation = "PUSH"
+        instr.arguments = [Register("FL")]
+
+        self.PUSH(instr)
+
+        self.set_flag(IF, 0)  # Asi uselles v emulátoru, ale tak pro sichr
+        self.set_flag(TF, 0)
+
+        instr.arguments = [Register("CS")]
+        self.PUSH(instr)
+        instr.arguments = [Register("IP")]
+        self.PUSH(instr)
+
+        self.set_register("CS", self.get_byte(
+            "ABS", instruction.arguments[0].value * 4 + 2))
+        self.set_register("IP", self.get_byte(
+            "ABS", instruction.arguments[0].value * 4))
 
     def INT21h(self, instruction):
         """Loads one byte from console."""
@@ -539,7 +665,18 @@ class Emulator:
                 self.set_byte("DS", offset + 1, i)
 
     def IRET(self, instruction):
-        pass
+        instr = Instruction()
+        instr.operation = "POP"
+        instr.arguments = [Register("IP")]
+        self.POP(instr)
+
+        instr.arguments = [Register("CS")]
+        self.POP(instr)
+
+        instr.arguments = [Register("FL")]
+        self.POP(instr)
+
+        self.set_flag(IF, 1)
 
     # ------- ANOTHER INSTRUCTIONS: --------
 
@@ -563,6 +700,11 @@ class Emulator:
     def HLT(self, instruction):
         # Už jsme ji pro Vás naprogramovali ;-)
         self.running = False
+
+    def print_registers(self):
+        print("Registers:")
+        for reg, val in self.registers.items():
+            print(f"{reg}: {val}")
 
 
 def get_bit(number: int, position: int):
@@ -627,7 +769,11 @@ nums    db 64
         db 0
 """
 
-    brandejs_kostra = """
+    code = """
+segment vector_preruseni
+    db 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    db 'Hello world'
+
 segment	code
 ..start	mov bx,data
 	mov ds,bx
@@ -660,13 +806,56 @@ segment muj_stack
 
 """
 
-    program = assemble(brandejs_kostra)
-    print(program)
+    test3 = """
+segment vektor_preruseni
+int0    dw hhh
+        dw handle0
+    
+segment code
+..start	mov bx,data
+        mov ds,bx
+        mov bx,stack
+        mov ss,bx
+        mov sp,dno
 
-    e = Emulator(program)
+        mov AH,2
+        mov DL, 'a'
+        int 21h
+        
+        MOV AX, 0
+        IDIV AL
+        HLT
+
+segment data
+        db 0
+        resb 16
+
+segment hhh
+handle0 mov AH,2
+        mov DL, 'x'
+        int 21h
+        IRET
+
+
+segment	stack
+	resb 16
+dno:	db ?
+
+"""
+
+    aaaa = """
+segment code
+    MOV AX, 0
+    MOV BX, 'x'
+    HLT
+"""
+
+    program, start, lines_info = assemble(test3)
+
+    e = Emulator(program, start, lines_info)
     # e.registers["DS"] = 0  # For debugging purposes
     e.run()
     print(e.registers)
-    print([hex(b) for b in e.program if b is not None])
     print(e.program)
     print("Console output:", e.console_output.replace("\n", "\\n"))
+    e.print_registers()

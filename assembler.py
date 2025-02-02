@@ -8,8 +8,10 @@ Info = dict[str, None | int | list[int]]
 MAX_SEGMENT_SIZE = 2**16
 
 
-def assemble(code: str) -> list[int]:
+def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int, str]]]:
     labels = {}
+    info_for_line_linting = {}
+    start = (0, 0)
     segment_length = 0
     total_length = 0  # TODO: rename
 
@@ -23,10 +25,10 @@ def assemble(code: str) -> list[int]:
         line = line.replace("'$'", '0')
         line = line.replace('"$"', '0')
 
-        if line.strip() == "":
+        if line.strip() == "" or line.lstrip().startswith(";"):
             continue
 
-        print(f"line: {i} | byte: {total_length}: {line}")
+        # print(f"line: {i} | byte: {total_length}: {line}")
 
         if line.startswith("segment"):
             if segment_length != 0:
@@ -39,6 +41,9 @@ def assemble(code: str) -> list[int]:
 
             continue
 
+        # Needs to be rewritten
+        info_for_line_linting[total_length] = (i, line)
+
         label, instr, args = parse_line_parts(line)
 
         if label != "":
@@ -46,6 +51,9 @@ def assemble(code: str) -> list[int]:
             labels[label] = segment_length
             # Bolí mě z toho oči, ale nestíhám. TODO: Přepsat
             labels_segment[label] = segment
+
+        if label in ["start", "..start"]:
+            start = (labels[segment], len(templates))
 
         has_prefix = contains_prefix(line)
 
@@ -59,15 +67,6 @@ def assemble(code: str) -> list[int]:
                     size = 32
 
             if instr[0] == "D":
-                expected_length = 0
-                updated_args = []
-                for arg in args:
-                    if arg[0] in STRING_QUOTES and arg[-1] in STRING_QUOTES:
-                        updated_args.extend(convert_string_arg_to_numbers(arg))
-                    else:
-                        updated_args.append(arg)
-
-                args = updated_args
                 expected_length = len(args) * (size // 8)
 
             elif "RES" in instr:
@@ -121,7 +120,7 @@ def assemble(code: str) -> list[int]:
             bytes_remaining_in_segment(len(segment_bytecode)))])
         bytecode.extend(segment_bytecode)
 
-    return bytecode
+    return bytecode, start, info_for_line_linting
 
 
 def contains_prefix(line: str) -> bool:
@@ -150,6 +149,19 @@ def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     line, _ = split_on(line, ";")
 
     args = [l.strip() for l in line.split(",")]
+
+    updated_args = []
+    for arg in args:
+        if arg == "":
+            updated_args.append(arg)
+            continue
+
+        if arg[0] in STRING_QUOTES and arg[-1] in STRING_QUOTES:
+            updated_args.extend(convert_string_arg_to_numbers(arg))
+        else:
+            updated_args.append(arg)
+
+    args = updated_args
 
     return label, instr, args
 

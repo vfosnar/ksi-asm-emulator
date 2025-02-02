@@ -135,7 +135,7 @@ STRING_QUOTES = ['"', "'"]
 
 # Flags
 Flag = int
-CF, PF, ZF, SF, OF = 0, 2, 6, 7, 11
+CF, PF, ZF, SF, TF, IF, OF = 0, 2, 6, 7, 8, 9, 11
 
 SIMPLE_CONDITION_JMPS = {
     'JE': [(ZF, 1)],
