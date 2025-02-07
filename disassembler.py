@@ -1,4 +1,5 @@
 from data import *
+from converting_functions import *
 
 
 def parse_next_instruction(program, address) -> tuple['Instruction', int]:
@@ -68,7 +69,14 @@ def parse_next_instruction(program, address) -> tuple['Instruction', int]:
             continue
 
         if arg[0] == "J":
-            instruction.arguments.append(Immutable(load_next()))
+            val = load_next()
+            if instruction.size == 16:
+                val += load_next() * 2**8
+
+            val = from_twos_complement(val, instruction.size)
+
+            instruction.arguments.append(Immutable(val))
+                
             continue
 
         if arg[0] == "A":

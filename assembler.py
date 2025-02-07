@@ -351,6 +351,17 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
 
                 desitny = calculate_value(arg, labels)
                 dist = desitny - curr_instr_idx - info["expected_length"]
+                
+
+                if dist >= 0:
+                    # Because there are added NOPs to shorter instructions than expected
+                    my_length = 1 if "prefix" in info else 0
+                    my_length += 1 # opcode
+                    my_length += 1 if size == 8 else 2
+                    
+                    dist += info["expected_length"] - my_length 
+                    
+
                 assert -2**(size-1) <= dist < 2**(size -
                                                   1), f"Relative jump too far: {dist}"
                 dist = to_twos_complement(
