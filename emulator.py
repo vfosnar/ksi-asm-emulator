@@ -743,9 +743,9 @@ class Emulator:
 
         if possible_line is not None:
             print(
-                f"Address: {address}, instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
+                f"Abs address: {address}, instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
         elif instr.operation != "NOP":
-            print(f"Address: {address}, instr: {instr.operation} \tline (unknown)")
+            print(f"Abs address: {address}, instr: {instr.operation} \tline (unknown)")
 
 
 def get_bit(number: int, position: int):
