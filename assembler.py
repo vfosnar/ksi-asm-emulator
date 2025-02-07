@@ -19,7 +19,6 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
     segments_templates = []
     labels_segment = {}
 
-    # Pls keep enumberate for error line info (W.I.P.)
     for i, line in enumerate(code.split("\n")):
         line = re.sub(r'\s+', ' ', line)  # Make all whitespace one space
         line = line.replace("'$'", '0')
@@ -27,8 +26,6 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
 
         if line.strip() == "" or line.lstrip().startswith(";"):
             continue
-
-        # print(f"line: {i} | byte: {total_length}: {line}")
 
         if line.startswith("segment"):
             if segment_length != 0:

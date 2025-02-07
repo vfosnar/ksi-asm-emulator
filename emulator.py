@@ -7,7 +7,9 @@ class Emulator:
 
     def __init__(self, program, start: tuple[int, int] = (0, 0), lines_info: list[tuple[int, str]] = []):
         self.instructions_counter = 0
-        self.MAX_INSTRUCTIONS = 10_000
+        self.max_instructions = 10_000
+
+        self.debugging_mode: bool = True
 
         self.registers = {
             # 16-bitový registr AX je složen ze dvou 8-botivých registrů AH,AL
@@ -55,38 +57,49 @@ class Emulator:
         self.console_input: str = "Hello\nworld\n"
         self.console_output: str = ""
 
+        self.statistics = {}
+
         self._complete_instruction_dictionary()
 
         self.lines_info = lines_info
 
     def run(self):
         while self.running:
-            if self.instructions_counter > self.MAX_INSTRUCTIONS:
+            if self.instructions_counter > self.max_instructions:
                 raise Exception(
-                    f"Váš program vykonal {self.instructions_counter} instrukcí. Zřejmě došlo k zacyklení. Pokud ne, navyšte hodnotu MAX_INSTRUCTIONS.")
+                    f"Your program executed more than {self.instructions_counter - 1} instructions. There may be an infinite loop.")
             self.instructions_counter += 1
 
-            # TODO: nechci to dát dovnitř třídy??
             address = self.get_address("CS", self.get_register("IP"))
-            instr, span = parse_next_instruction(self.program, address)
 
-            # TODO: tohle bych měl zabalit do debugování
-            possible_line = self.lines_info.get(address)
+            try:
+                instr, span = parse_next_instruction(self.program, address)
+            except Exception as e:
+                raise Exception(f"Error while parsing instruction at address: {address}. Perhaps you've forgotten HLT or you're jumping to wrong address.")
 
-            if possible_line is not None:
-                print(
-                    f"Abs address: [{address}], instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
-            elif instr.operation != "NOP":
-                print(f"Abs address: [{address}], instr: {instr.operation} \tline (unknown)")
+            self.statistics[instr.operation] = self.statistics.get(instr.operation, 0) + 1
+
+
+            if self.debugging_mode:
+                self.debug_print_line(address, instr)
 
             if instr.operation not in self.instr_methods:
-                raise Exception(
-                    f"This emulator doesn't support this operation: {instr.operation}")
+                raise Exception(f"This emulator doesn't support this operation: {instr.operation}")
             
             self.set_register("IP", self.get_register("IP") + span)
-                        
-            corresponding_method = self.instr_methods[instr.operation]
-            corresponding_method(instr)
+
+            try:
+                corresponding_method = self.instr_methods[instr.operation]
+                corresponding_method(instr)
+            except Exception as e:
+
+                line = self.lines_info.get(address)
+                if line is not None:
+                    print(f"Error may be related to line {line[0]}:{line[1]}")
+                else:
+                    print("This error didn't happen handling any of your lines.")
+
+                raise Exception(f"There was an error while handling instruction {instr.operation}:", e)
             
 
     def _complete_instruction_dictionary(self):
@@ -721,22 +734,18 @@ class Emulator:
     # ROL, ROR, RCR, RCL - Rotate
     # SAL, SHL, SAR, SHR - Shift
 
-    # STACK - Zvláštní úloha
-    # PUSH, POP
-
-    # CALL, RET
-
-    # INTERUPTIONS - Zvláštní úloha
-    # INT, IRET
-
     def HLT(self, instruction):
         # Už jsme ji pro Vás naprogramovali ;-)
         self.running = False
+    
+    def debug_print_line(self, address: int, instr: Instruction):
+        possible_line = self.lines_info.get(address)
 
-    def print_registers(self):
-        print("Registers:")
-        for reg, val in self.registers.items():
-            print(f"{reg}: {val}")
+        if possible_line is not None:
+            print(
+                f"Address: {address}, instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
+        elif instr.operation != "NOP":
+            print(f"Address: {address}, instr: {instr.operation} \tline (unknown)")
 
 
 def get_bit(number: int, position: int):
@@ -888,8 +897,8 @@ segment code
 
     e = Emulator(program, start, lines_info)
     # e.registers["DS"] = 0  # For debugging purposes
-    e.run()
+    if not e.run():
+        print("Program was stopped because of an error.")
     print(e.registers)
     print(e.program)
     print("Console output:", e.console_output.replace("\n", "\\n"))
-    e.print_registers()

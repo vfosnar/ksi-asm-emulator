@@ -20,7 +20,7 @@ loop_s	mov AH, 0Ah	; Přečíst řádek
 cont 	MOV BX, [nacteno+1]	; delka
 	 	MOV byte [BX+2],  0
 	 
-		mov AH,9	; Identifikace služby Vypsat řetězec bajtů na terminál
+		mov AH,9	; Vypsat řetězec bajtů na terminál
 		mov DX,radek
 		int 21h	
 
@@ -34,7 +34,7 @@ radek	resb 80
 
 
 segment	stack
-		resb 16
+		resb 256
 dno		db 0
         
 """
@@ -46,13 +46,15 @@ program, start, lines_info = assemble(code)
 # Inicializovat tím emulátor
 e = Emulator(program, start, lines_info)
 
-# [volitelné] Nastavit vstup konzole, upravit maximální počet instrukcí
+# [volitelné] Nastavit vstup konzole, upravit maximální počet instrukcí, vypnutí debug módu (vypisování jednotlivých kroků)
 e.console_input = "Hello\nWorld\n"
 e.max_instructions = 100_000
+# e.debugging_mode = False
 
 # Supstit
 e.run()
 
-# Výsledek můžete pozorovat např. na registrech nebo na výstupu konzole
+# Výsledek můžete pozorovat např. na registrech, výstupu konzole nebo na statistikách instrukcí
 print(e.registers)
 print("Console output:", e.console_output.replace("\n", "\\n"))
+print(e.statistics)
