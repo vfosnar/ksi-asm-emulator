@@ -144,7 +144,11 @@ def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     line = capitalize_registers(line)
 
     label, line = line.split(" ", 1)  # If no label, empty string
+
     instr, line = split_on(line, " ")
+    
+    instr = INSTRUCTION_ALIASES.get(instr, instr)
+
     instr = instr.upper()
     line, _ = split_on(line, ";")
 

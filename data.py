@@ -168,6 +168,16 @@ SIMPLE_CONDITION_JMPS = {
 MISSING_CONDITION_JMPS = ['JL', 'JNGE',
                           'JG', 'JNLE', 'JLE', 'JNG', 'JGE', 'JNL']
 
+INSTRUCTION_ALIASES = {
+    "JE": "JZ",
+    "JNE": "JNZ",
+    "JG": "JNLE",
+    "JGE": "JNL",
+    "JL": "JNGE",
+    "JLE": "JNG"
+}
+
+
 INSTRUCTIONS_v2 = {
     "ADD8": [
         ("Eb Gb", {"opcode": 0, "expected_length": 4}),
