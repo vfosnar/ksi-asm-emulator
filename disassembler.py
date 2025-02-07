@@ -1,14 +1,14 @@
 from data import *
 
 
-def parse_next_instruction(program, IP) -> tuple['Instruction', int]:
+def parse_next_instruction(program, address) -> tuple['Instruction', int]:
     """Just in time dissasembler"""
     instruction = Instruction()
     span = 0
 
     def load_next():
         nonlocal span
-        byte = program[IP + span]
+        byte = program[address + span]
         assert byte is not None, "Načítáte nedefinovaný bit jako instrukci. Nezapoměli jste HLT??"
         span += 1
         instruction.bytes.append(byte)

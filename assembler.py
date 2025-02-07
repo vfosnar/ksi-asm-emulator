@@ -36,7 +36,7 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
 
             segment = line.split(" ")[1]
             segment_length = 0
-            labels[segment] = total_length
+            labels[segment] = total_length // 16
             segments_templates.append([])
 
             continue
@@ -131,8 +131,7 @@ def contains_prefix(line: str) -> bool:
 
 
 def bytes_remaining_in_segment(segment_length: int) -> int:
-    # TODO: Write something meaningfull
-    return 42  # Even tho 42 is an answer to everything, it is not for this.
+    return 16 - (segment_length % 16) if segment_length % 16 != 0 else 0
 
 
 def convert_string_arg_to_numbers(arg: str) -> list[str]:
@@ -509,7 +508,6 @@ def int_to_bytes(val: int, size: int) -> list[int]:
 
 
 if __name__ == "__main__":
-
     jmps = """
 segment code
         JMP loop_s

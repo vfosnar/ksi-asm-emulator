@@ -47,6 +47,9 @@ class Emulator:
             "POP": self.POP, "RET": self.RET, "RETF": self.RETF,
             "INT": self.INT, "TST": self.TEST, "DIV": self.DIV,
             "IDIV": self.IDIV, "IRET": self.IRET, "CBW": self.CBW,
+            "RET": self.RET, "RETF": self.RETF, "INT": self.INT,
+            "IRET": self.IRET, "CBW": self.CBW
+            # Conditional jumps are added later in the code from a dictionary
         }
 
         self.console_input: str = "Hello\nworld\n"
@@ -64,24 +67,27 @@ class Emulator:
             self.instructions_counter += 1
 
             # TODO: nechci to dát dovnitř třídy??
-            instr, span = parse_next_instruction(
-                self.program,
-                self.get_register("CS") + self.registers["IP"]
-            )
+            address = self.get_address("CS", self.get_register("IP"))
+            instr, span = parse_next_instruction(self.program, address)
 
-            possible_line = self.lines_info.get(
-                self.get_register("CS") + self.registers["IP"])
+            # TODO: tohle bych měl zabalit do debugování
+            possible_line = self.lines_info.get(address)
 
-            if not (instr.operation == "NOP" and possible_line is None):
+            if possible_line is not None:
                 print(
-                    f"Abs address: [{self.registers['CS'] + self.registers['IP']}], instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
+                    f"Abs address: [{address}], instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
+            elif instr.operation != "NOP":
+                print(f"Abs address: [{address}], instr: {instr.operation} \tline (unknown)")
 
             if instr.operation not in self.instr_methods:
                 raise Exception(
                     f"This emulator doesn't support this operation: {instr.operation}")
-            self.registers["IP"] += span
-
-            self.instr_methods[instr.operation](instr)
+            
+            self.set_register("IP", self.get_register("IP") + span)
+                        
+            corresponding_method = self.instr_methods[instr.operation]
+            corresponding_method(instr)
+            
 
     def _complete_instruction_dictionary(self):
         for instr in SIMPLE_CONDITION_JMPS.keys():
@@ -90,14 +96,26 @@ class Emulator:
         for instr in MISSING_CONDITION_JMPS:
             self.instr_methods[instr] = self.conditional_jump
 
-    def get_address(self, arg: Memmory):
+    def get_address(self, segment, offset):
+        address = 0
+
+        if isinstance(segment, int):
+            address = segment
+        elif isinstance(segment, str):
+            address = self.get_register(segment)
+        else:
+            address = self.get_value(segment)
+        
+        return address * 16 + offset
+
+    def get_memmory(self, arg: Memmory):
         segment = self.get_register(arg.segment)
         offset += arg.displacement
 
         for reg in arg.source.split("+"):
             offset += self.get_register(reg)
 
-        return segment + offset
+        return segment * 16 + offset
 
     def get_register(self, reg: str):
         reg = reg.upper()
@@ -139,18 +157,27 @@ class Emulator:
             seg_val = 0
         else:
             seg_val = self.get_register(segment)
-        val = self.program[seg_val + offset]
+        
+        idx = self.get_address(seg_val, offset)
+        if idx >= len(self.program):
+            raise Exception(f"Trying to get value of undefined byte at {idx}.")
 
-        assert val is not None, f"Trying to get value of undefined byte at {segment + offset}."
+        val = self.program[idx]
+
+        assert val is not None, f"Trying to get value of undefined byte at {idx}."
         return val
 
     def set_byte(self, segment, offset, value):
         assert 0 <= value <= 2**8
         seg = self.get_register(segment)
-        self.program[seg + offset] = value
+        idx = self.get_address(seg, offset)
+        
+        if idx >= len(self.program):
+            raise Exception(f"Trying to set value data out of program memmory.")
+        
+        self.program[idx] = value
 
     def get_value(self, arg: Parameter):
-        # Asi autorská pomocná funkce. Ať si to kdyžtak udělají sami.
         output = None
 
         match arg:
@@ -487,15 +514,18 @@ class Emulator:
     def JMP(self, instruction):
         if isinstance(instruction.arguments[0], Pointer):
             # Far jump
-            self.registers["IP"] = instruction.arguments[0].offset
-            self.registers["CS"] = instruction.arguments[0].segment
+            self.set_register("IP", instruction.arguments[0].offset)
+            self.set_register("CS", instruction.arguments[0].segment)
         else:
             # Near jump
             assert isinstance(instruction.arguments[0], Immutable)
-            offset = from_twos_complement(
+            where_to = from_twos_complement(
                 instruction.arguments[0].value, instruction.size)
-            offset += 1  # TODO: Why +1!?
-            self.registers["IP"] = (self.registers["IP"] + offset) % 2**16
+            where_to += 1  # TODO: Why +1!?
+            where_to += self.get_register("IP")
+            where_to %= 2**16
+
+            self.set_register("IP", where_to)
 
     def CALL(self, instruction: Instruction):
         is_far = isinstance(instruction.arguments[0], Pointer)
@@ -506,7 +536,7 @@ class Emulator:
             instr.arguments = [Register("CS")]
             self.PUSH(instr)
 
-        val = self.get_register("IP") + len(instruction.bytes) - 1
+        val = self.get_register("IP") + len(instruction.bytes) - 1  # Is safe
         instr.arguments = [Immutable(val)]
         self.PUSH(instr)
 
@@ -597,10 +627,12 @@ class Emulator:
     # ------- INTERUPT INSTRUCTIONS: --------
 
     def INT(self, instruction):
+        print("Program was interrupted with: INT", instruction.arguments[0].value)
+
         if instruction.arguments[0].value == 0x21:
             self.INT21h(instruction)
             return
-
+        
         instr = Instruction()
         instr.operation = "PUSH"
         instr.arguments = [Register("FL")]
@@ -851,6 +883,8 @@ segment code
 """
 
     program, start, lines_info = assemble(test3)
+
+    print(lines_info)
 
     e = Emulator(program, start, lines_info)
     # e.registers["DS"] = 0  # For debugging purposes
