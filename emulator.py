@@ -252,7 +252,8 @@ class Emulator:
         self.set_flag(SF, sign == 1)
 
     def update_cf(self, result, opsize):
-        self.set_flag(CF, result >= 2**opsize)
+        is_carry = not (0 <= result < 2**opsize)
+        self.set_flag(CF, is_carry)
 
     def update_of(self, result, opsize):
         """TAKES AS ARGUMENT SIGNED RESULT"""
