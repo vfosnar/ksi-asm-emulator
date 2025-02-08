@@ -169,12 +169,14 @@ MISSING_CONDITION_JMPS = ['JL', 'JNGE',
                           'JG', 'JNLE', 'JLE', 'JNG', 'JGE', 'JNL']
 
 INSTRUCTION_ALIASES = {
-    "JE": "JZ",
-    "JNE": "JNZ",
-    "JG": "JNLE",
-    "JGE": "JNL",
-    "JL": "JNGE",
-    "JLE": "JNG"
+    "JNAE": "JB",
+    "JNGE": "JL",
+    "JNBE": "JA",
+    "JNLE": "JG",
+    "JNA": "JBE",
+    "JNG": "JLE",
+    "JNB": "JAE",
+    "JNL": "JGE",
 }
 
 
