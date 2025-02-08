@@ -591,28 +591,16 @@ class Emulator:
             case "JL":
                 if self.get_flag(SF) != self.get_flag(OF):
                     self.relative_jump(instruction)
-            case "JNGE":
-                if self.get_flag(SF) != self.get_flag(OF):
-                    self.relative_jump(instruction)
 
             case "JG":
-                if self.get_flag(SF) == self.get_flag(OF) and self.get_flag(ZF) == 0:
-                    self.relative_jump(instruction)
-            case "JNLE":
                 if self.get_flag(SF) == self.get_flag(OF) and self.get_flag(ZF) == 0:
                     self.relative_jump(instruction)
 
             case "JLE":
                 if self.get_flag(SF) != self.get_flag(OF) or self.get_flag(ZF) == 1:
                     self.relative_jump(instruction)
-            case "JNG":
-                if self.get_flag(SF) != self.get_flag(OF) or self.get_flag(ZF) == 1:
-                    self.relative_jump(instruction)
 
             case "JGE":
-                if self.get_flag(SF) == self.get_flag(OF):
-                    self.relative_jump(instruction)
-            case "JNL":
                 if self.get_flag(SF) == self.get_flag(OF):
                     self.relative_jump(instruction)
             case _:
