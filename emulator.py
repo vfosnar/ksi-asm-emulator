@@ -248,8 +248,8 @@ class Emulator:
 
     def update_sf(self, result, opsize):
         """Sets the sign flag."""
-        sign = result // 2**(8*opsize - 1)
-        self.set_flag(SF, sign == 0)
+        sign = (result // 2**(opsize - 1)) % 2
+        self.set_flag(SF, sign == 1)
 
     def update_cf(self, result, opsize):
         is_carry = not (0 <= result < 2**opsize)
