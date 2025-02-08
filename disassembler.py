@@ -36,10 +36,13 @@ def parse_next_instruction(program, address) -> tuple['Instruction', int]:
 
     # Size of operation for better DevEx
     instruction.size = 0
-    if "b" in properties:
+    if "b" in properties or properties in RM_8_REGS:
         instruction.size = 8
     elif "w" in properties or "v" in properties:
         instruction.size = 16
+    elif properties in SEG_REGS or properties in RM_16_REGS:
+        instruction.size = 16
+    
 
     for arg in properties.split():
         # Codes that don't need ModRM byte:
