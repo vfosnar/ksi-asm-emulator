@@ -172,7 +172,7 @@ INSTRUCTION_ALIASES = {
     "JE": "JZ",
     "JNE": "JNZ",
     "JP": "JPE",
-    "JPO": "JNP",
+    "JNP":"JPO",    
 
     "JNAE": "JB",
     "JNGE": "JL",
