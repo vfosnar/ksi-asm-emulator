@@ -50,7 +50,9 @@ class Emulator:
             "INT": self.INT, "TST": self.TEST, "DIV": self.DIV,
             "IDIV": self.IDIV, "IRET": self.IRET, "CBW": self.CBW,
             "RET": self.RET, "RETF": self.RETF, "INT": self.INT,
-            "IRET": self.IRET, "CBW": self.CBW
+            "IRET": self.IRET, "CBW": self.CBW, "ROL": self.ROL,
+            "ROR": self.ROR, "RCR": self.RCR, "RCL": self.RCL,
+            "SHL": self.SHL, "SAR": self.SAR, "SHR": self.SHR,
             # Conditional jumps are added later in the code from a dictionary
         }
 
@@ -61,7 +63,7 @@ class Emulator:
 
         self._complete_instruction_dictionary()
 
-        self.lines_info = lines_info
+        self.lines_info = lines_info.copy()
 
     def run(self):
         while self.running:
@@ -712,6 +714,80 @@ class Emulator:
 
         self.set_flag(IF, 1)
 
+    # ------- ROTATE AND SHIFT INSTRUCTIONS: --------
+    def ROL(self, instruction):
+        val = self.get_value(instruction.arguments[0])
+        count = self.get_value(instruction.arguments[1])
+
+        result = (val << count) + (val >> (instruction.size - count))
+        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+
+        
+        self.update_flags(result, instruction.size, [CF])
+        if count == 1:
+            self.set_flag(OF, self.get_flag(CF) != get_bit(result, instruction.size - 1))
+
+    def ROR(self, instruction):
+        val = self.get_value(instruction.arguments[0])
+        count = self.get_value(instruction.arguments[1])
+
+        result = (val >> count) + (val << (instruction.size - count))
+        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+
+        self.set_flag(CF, get_bit(val, 0))
+        if count == 1:
+            self.set_flag(OF, get_bit(val, instruction.size - 1) != get_bit(result, instruction.size - 1))
+
+    def RCR(self, instruction):
+        val = self.get_value(instruction.arguments[0])
+        count = self.get_value(instruction.arguments[1])
+
+        result = (val >> count) + (val << (instruction.size - count))
+        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+
+        self.set_flag(CF, get_bit(val, 0))
+
+    def RCL(self, instruction):
+        val = self.get_value(instruction.arguments[0])
+        count = self.get_value(instruction.arguments[1])
+
+        result = (val << count) + (val >> (instruction.size - count))
+        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+
+        self.set_flag(CF, get_bit(val, instruction.size - 1))
+
+    def SHL(self, instruction):
+        val = self.get_value(instruction.arguments[0])
+        count = self.get_value(instruction.arguments[1])
+
+        result = val << count
+        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+
+        self.set_flag(CF, get_bit(val, instruction.size - count))
+        self.set_flag(OF, self.get_flag(CF) != get_bit(result, instruction.size - 1))
+    
+    def SAR(self, instruction):
+        val = self.get_value(instruction.arguments[0])
+        count = self.get_value(instruction.arguments[1])
+
+        result = val >> count
+        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+
+        self.set_flag(CF, get_bit(val, count - 1))
+        self.set_flag(OF, 0)
+    
+    def SHR(self, instruction):
+        val = self.get_value(instruction.arguments[0])
+        count = self.get_value(instruction.arguments[1])
+
+        result = val >> count
+        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+
+        self.set_flag(CF, get_bit(val, count - 1))
+        if count == 1:
+            self.set_flag(OF, get_bit(val, instruction.size - 1))
+
+
     # ------- ANOTHER INSTRUCTIONS: --------
 
     def NOP(self, instruction):
@@ -735,159 +811,3 @@ class Emulator:
                 f"Abs address: {address}, instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
         elif instr.operation != "NOP":
             print(f"Abs address: {address}, instr: {instr.operation} \tline (unknown)")
-
-
-def get_bit(number: int, position: int):
-    return (number // 2**position) % 2
-
-
-if __name__ == "__main__":
-
-    funkcni_cteni_a_psani_na_terminal = """
-segment code
-        MOV BX, data
-        MOV DS, BX
-
-        MOV AL, 9
-
-loop_s  MOV CH, AL
-        MOV AH, 1
-        INT 21h     ; Load character
-        JZ konec
-        MOV AH, 2
-        MOV DL, AL
-        INT 21h     ; Print space
-        MOV DL, 32
-        INT 21h     ; Print space
-        JMP FAR loop_s
-
-konec   HLT
-
-
-segment data
-n       db 97,98,0
-"""
-    test_code = """
-segment code
-        MOV BX, data
-        MOV DS, BX
-
-        MOV DL, [nums]
-        MOV DI, 1
-cycle   MOV BL, [nums+DI]
-        CMP BL, 0
-        JNZ nozero
-        JMP end
-nozero  CMP BL, DL
-        JB bellow
-        JMP else
-bellow  INC BL
-        JMP endif
-else    JA above
-        JMP endif
-above   DEC BL
-endif   MOV byte [nums+DI], BL
-        ADD DI,1
-        JMP cycle
-end     HLT
-
-segment data
-nums    db 64
-        db 66
-        db 64
-        db 9
-        db 0
-"""
-
-    code = """
-segment vector_preruseni
-    db 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
-    db 'Hello world'
-
-segment	code
-..start	mov bx,data
-	mov ds,bx
-	mov bx,stack
-	mov ss,bx
-	mov sp,dno
-    MOV BX, muj_stack
-    MOV ES, BX
-
-    MOV AX, 7
-    MOV ES:[1], AX
-
-	mov dx,mesg
-	mov ah,9
-	int 21h
-	hlt
-
-segment	data
-bajt	db 12h
-slovo	dw 2356h
-mesg	db 'Ahoj','$'
-
-segment	stack
-	resb 16
-dno:	db ?
-
-segment muj_stack
-    db 123
-    resb 16
-
-"""
-
-    test3 = """
-segment vektor_preruseni
-int0    dw hhh
-        dw handle0
-    
-segment code
-..start	mov bx,data
-        mov ds,bx
-        mov bx,stack
-        mov ss,bx
-        mov sp,dno
-
-        mov AH,2
-        mov DL, 'a'
-        int 21h
-        
-        MOV AX, 0
-        IDIV AL
-        HLT
-
-segment data
-        db 0
-        resb 16
-
-segment hhh
-handle0 mov AH,2
-        mov DL, 'x'
-        int 21h
-        IRET
-
-
-segment	stack
-	resb 16
-dno:	db ?
-
-"""
-
-    aaaa = """
-segment code
-    MOV AX, 0
-    MOV BX, 'x'
-    HLT
-"""
-
-    program, start, lines_info = assemble(test3)
-
-    print(lines_info)
-
-    e = Emulator(program, start, lines_info)
-    # e.registers["DS"] = 0  # For debugging purposes
-    if not e.run():
-        print("Program was stopped because of an error.")
-    print(e.registers)
-    print(e.program)
-    print("Console output:", e.console_output.replace("\n", "\\n"))
