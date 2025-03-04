@@ -24,6 +24,10 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
         line = line.replace("'$'", '0')
         line = line.replace('"$"', '0')
 
+        line = line.replace(" BYTE ", " byte ")
+        line = line.replace(" WORD ", " word ")
+        line = line.replace(" DOUBLEWORD ", " doubleword ")
+
         if line.strip() == "" or line.lstrip().startswith(";"):
             continue
 
