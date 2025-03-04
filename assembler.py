@@ -159,6 +159,9 @@ def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
         if arg[0] in STRING_QUOTES and arg[-1] in STRING_QUOTES:
             updated_args.extend(convert_string_arg_to_numbers(arg))
         else:
+            if arg.upper() in REGISTERS:
+                arg = arg.upper()
+
             updated_args.append(arg)
 
     args = updated_args

@@ -93,8 +93,6 @@ class Emulator:
                 raise Exception(
                     f"This emulator doesn't support this operation: {instr.operation}")
 
-            self.set_register("IP", self.get_register("IP") + span)
-
             try:
                 corresponding_method = self.instr_methods[instr.operation]
                 corresponding_method(instr)
@@ -108,6 +106,8 @@ class Emulator:
 
                 raise Exception(
                     f"There was an error while handling instruction {instr.operation}:", e)
+
+            self.set_register("IP", self.get_register("IP") + span)
 
     def _complete_instruction_dictionary(self):
         for instr in SIMPLE_CONDITION_JMPS.keys():
