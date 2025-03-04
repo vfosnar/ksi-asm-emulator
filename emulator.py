@@ -660,8 +660,11 @@ class Emulator:
 
         self.set_register("CS", self.get_byte(
             "ABS", instruction.arguments[0].value * 4 + 2))
-        self.set_register("IP", self.get_byte(
-            "ABS", instruction.arguments[0].value * 4))
+        
+        IP_val = self.get_byte(
+            "ABS", instruction.arguments[0].value * 4)
+        IP_val -= 1  # Because IP in increased before loading instruction
+        self.set_register("IP",  IP_val)
 
     def INT21h(self, instruction):
         """Loads one byte from console."""
