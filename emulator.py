@@ -25,6 +25,7 @@ class Emulator:
             "DH": None,
 
             "SP": None,  # Stack pointer
+            "BP": None,  # Base pointer
 
             "CS": start[0],  # Code segment
             "DS": None,  # Data segment
@@ -50,9 +51,10 @@ class Emulator:
             "INT": self.INT, "TST": self.TEST, "DIV": self.DIV,
             "IDIV": self.IDIV, "IRET": self.IRET, "CBW": self.CBW,
             "RET": self.RET, "RETF": self.RETF, "INT": self.INT,
-            "IRET": self.IRET, "CBW": self.CBW, "ROL": self.ROL,
-            "ROR": self.ROR, "RCR": self.RCR, "RCL": self.RCL,
-            "SHL": self.SHL, "SAR": self.SAR, "SHR": self.SHR,
+            "IRET": self.IRET, "CBW": self.CBW, "INTO": self.INTO,
+            "ROL": self.ROL, "ROR": self.ROR, "RCR": self.RCR, 
+            "RCL": self.RCL, "SHL": self.SHL, "SAR": self.SAR, 
+            "SHR": self.SHR,
             # Conditional jumps are added later in the code from a dictionary
         }
 
@@ -77,17 +79,19 @@ class Emulator:
             try:
                 instr, span = parse_next_instruction(self.program, address)
             except Exception as e:
-                raise Exception(f"Error while parsing instruction at address: {address}. Perhaps you've forgotten HLT or you're jumping to wrong address.")
+                raise Exception(
+                    f"Error while parsing instruction at address: {address}. Perhaps you've forgotten HLT or you're jumping to wrong address.")
 
-            self.statistics[instr.operation] = self.statistics.get(instr.operation, 0) + 1
-
+            self.statistics[instr.operation] = self.statistics.get(
+                instr.operation, 0) + 1
 
             if self.debugging_mode:
                 self.debug_print_line(address, instr)
 
             if instr.operation not in self.instr_methods:
-                raise Exception(f"This emulator doesn't support this operation: {instr.operation}")
-            
+                raise Exception(
+                    f"This emulator doesn't support this operation: {instr.operation}")
+
             self.set_register("IP", self.get_register("IP") + span)
 
             try:
@@ -101,8 +105,8 @@ class Emulator:
                 else:
                     print("This error didn't happen handling any of your lines.")
 
-                raise Exception(f"There was an error while handling instruction {instr.operation}:", e)
-            
+                raise Exception(
+                    f"There was an error while handling instruction {instr.operation}:", e)
 
     def _complete_instruction_dictionary(self):
         for instr in SIMPLE_CONDITION_JMPS.keys():
@@ -120,7 +124,7 @@ class Emulator:
             address = self.get_register(segment)
         else:
             address = self.get_value(segment)
-        
+
         return address * 16 + offset
 
     def get_memmory(self, arg: Memmory):
@@ -160,7 +164,7 @@ class Emulator:
             self.registers[reg[0]+'H'] = val // 2**8
             return
 
-        if reg[1] in ["L", "H"]:
+        if reg[1] in ["L", "H"] and reg != "FL":
             assert 0 <= val < 2**8
         else:
             assert 0 <= val < 2**16
@@ -172,7 +176,7 @@ class Emulator:
             seg_val = 0
         else:
             seg_val = self.get_register(segment)
-        
+
         idx = self.get_address(seg_val, offset)
         if idx >= len(self.program):
             raise Exception(f"Trying to get value of undefined byte at {idx}.")
@@ -186,10 +190,11 @@ class Emulator:
         assert 0 <= value <= 2**8
         seg = self.get_register(segment)
         idx = self.get_address(seg, offset)
-        
+
         if idx >= len(self.program):
-            raise Exception(f"Trying to set value data out of program memmory.")
-        
+            raise Exception(
+                f"Trying to set value data out of program memmory.")
+
         self.program[idx] = value
 
     def get_value(self, arg: Parameter):
@@ -631,12 +636,13 @@ class Emulator:
     # ------- INTERUPT INSTRUCTIONS: --------
 
     def INT(self, instruction):
-        print("Program was interrupted with: INT", instruction.arguments[0].value)
+        print("Program was interrupted with: INT",
+              instruction.arguments[0].value)
 
         if instruction.arguments[0].value == 0x21:
             self.INT21h(instruction)
             return
-        
+
         instr = Instruction()
         instr.operation = "PUSH"
         instr.arguments = [Register("FL")]
@@ -699,6 +705,12 @@ class Emulator:
                     self.set_byte("DS", offset + i + 2, ord(char))
 
                 self.set_byte("DS", offset + 1, i)
+
+    def INTO(self, instruction):
+        if self.get_flag(OF) == 1:
+            instr = Instruction()
+            instr.arguments = [Immutable(4)]
+            self.INT(instr)
 
     def IRET(self, instruction):
         instr = Instruction()
