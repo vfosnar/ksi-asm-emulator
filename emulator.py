@@ -54,7 +54,8 @@ class Emulator:
             "IRET": self.IRET, "CBW": self.CBW, "INTO": self.INTO,
             "ROL": self.ROL, "ROR": self.ROR, "RCR": self.RCR, 
             "RCL": self.RCL, "SHL": self.SHL, "SAR": self.SAR, 
-            "SHR": self.SHR,
+            "SHR": self.SHR, "MUL": self.MUL, "IMUL": self.IMUL,
+            
             # Conditional jumps are added later in the code from a dictionary
         }
 
