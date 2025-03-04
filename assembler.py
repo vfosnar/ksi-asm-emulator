@@ -54,6 +54,9 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
 
         has_prefix = contains_prefix(line)
 
+        if instr.strip() == "":  # No instruction, only label
+            continue
+
         if instr in DATA_INSTRUCTIONS:
             match instr[-1]:
                 case "B":
@@ -139,10 +142,13 @@ def convert_string_arg_to_numbers(arg: str) -> list[str]:
 def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
     line = capitalize_registers(line)
 
+    if " " not in line:
+        return line, "", []
+
     label, line = line.split(" ", 1)  # If no label, empty string
 
     instr, line = split_on(line, " ")
-    
+
     instr = INSTRUCTION_ALIASES.get(instr, instr)
 
     instr = instr.upper()
@@ -354,16 +360,14 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
 
                 desitny = calculate_value(arg, labels)
                 dist = desitny - curr_instr_idx - info["expected_length"]
-                
 
                 if dist >= 0:
                     # Because there are added NOPs to shorter instructions than expected
                     my_length = 1 if "prefix" in info else 0
-                    my_length += 1 # opcode
+                    my_length += 1  # opcode
                     my_length += 1 if size == 8 else 2
-                    
-                    dist += info["expected_length"] - my_length 
-                    
+
+                    dist += info["expected_length"] - my_length
 
                 assert -2**(size-1) <= dist < 2**(size -
                                                   1), f"Relative jump too far: {dist}"
