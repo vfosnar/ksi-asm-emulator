@@ -203,6 +203,10 @@ def get_instruction_size(instruction: str, args: list[str]) -> int:
             return 32
         return 16
 
+    # Tak tohle je úplná tragédie, ale funguje
+    if instruction in GRP2_INSTRUCTIONS:
+        return get_instruction_size("-", [args[0]])
+
     if instruction[0] == "J":
         # JZ, JNZ, ...
         return 8

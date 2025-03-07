@@ -125,6 +125,8 @@ GRPs = {
     "GRP5": [('INC', ''), ('DEC', ''), ('CALL', ''), ('CALL', 'Mp'), ('JMP', ''), ('JMP', 'Mp'), ('PUSH', ''), ('--', '')]
 }
 
+GRP2_INSTRUCTIONS = [instr[0] for instr in GRPs["GRP2"]]
+
 INSTRUCTIONS_WITHOUT_PARAMETER = {"DAA", "DAS", "AAA", "AAS", "NOP", "CBW", "CWD", "WAIT", "PUSHF", "POPF", "SAHF", "LAHF", "MOVSB", "MOVSW",
                                   "CMPSB", "CMPSW", "STOSB", "STOSW", "LODSB", "LODSW", "SCASB", "SCASW", "RET", "RETF", "INTO", "IRET", "XLAT",
                                   "LOCK", "REPNZ", "REPZ", "HLT", "CMC", "CLC", "STC", "CLI", "STI", "CLD", "STD"}
@@ -172,7 +174,7 @@ INSTRUCTION_ALIASES = {
     "JE": "JZ",
     "JNE": "JNZ",
     "JP": "JPE",
-    "JNP":"JPO",    
+    "JNP": "JPO",
 
     "JNAE": "JB",
     "JNGE": "JL",
@@ -466,9 +468,7 @@ INSTRUCTIONS_v2 = {
     "AAM0": [("I0", {"opcode": 212, "expected_length": 3})],
     "AAD0": [("I0", {"opcode": 213, "expected_length": 3})],
     "XLAT0": [("", {"opcode": 215, "expected_length": 1})],
-    "CO-PROCESSOR INSTRUCTIONS0": [
-        ("", {"opcode": 216, "expected_length": 1})
-    ],
+    "CO-PROCESSOR INSTRUCTIONS0": [("", {"opcode": 216, "expected_length": 1})],
     "LOOPNZ8": [("Jb", {"opcode": 224, "expected_length": 2})],
     "LOOPZ8": [("Jb", {"opcode": 225, "expected_length": 2})],
     "LOOP8": [("Jb", {"opcode": 226, "expected_length": 2})],
@@ -508,58 +508,100 @@ INSTRUCTIONS_v2 = {
     "ROL8": [
         ("Eb 1", {"opcode": 208, "modrm": 0, "expected_length": 4}),
         ("Eb 1", {"opcode": 208, "modrm": 0, "expected_length": 4}),
+        ("Eb 1", {"opcode": 208, "modrm": 0, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 0, "expected_length": 2}),
+        ("Eb 1", {"opcode": 208, "modrm": 0, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 0, "expected_length": 2}),
     ],
     "ROL16": [
         ("Ev 1", {"opcode": 209, "modrm": 0, "expected_length": 4}),
         ("Ev 1", {"opcode": 209, "modrm": 0, "expected_length": 4}),
+        ("Ev 1", {"opcode": 209, "modrm": 0, "expected_length": 2}),
+        ("Ev CL", {"opcode": 211, "modrm": 0, "expected_length": 2}),
     ],
     "ROR8": [
         ("Eb 1", {"opcode": 208, "modrm": 8, "expected_length": 4}),
         ("Eb 1", {"opcode": 208, "modrm": 8, "expected_length": 4}),
+        ("Eb 1", {"opcode": 208, "modrm": 8, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 8, "expected_length": 2}),
+        ("Eb 1", {"opcode": 208, "modrm": 8, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 8, "expected_length": 2}),
     ],
     "ROR16": [
         ("Ev 1", {"opcode": 209, "modrm": 8, "expected_length": 4}),
         ("Ev 1", {"opcode": 209, "modrm": 8, "expected_length": 4}),
+        ("Ev 1", {"opcode": 209, "modrm": 8, "expected_length": 2}),
+        ("Ev CL", {"opcode": 211, "modrm": 8, "expected_length": 2}),
     ],
     "RCL8": [
         ("Eb 1", {"opcode": 208, "modrm": 16, "expected_length": 4}),
         ("Eb 1", {"opcode": 208, "modrm": 16, "expected_length": 4}),
+        ("Eb 1", {"opcode": 208, "modrm": 16, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 16, "expected_length": 2}),
+        ("Eb 1", {"opcode": 208, "modrm": 16, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 16, "expected_length": 2}),
     ],
     "RCL16": [
         ("Ev 1", {"opcode": 209, "modrm": 16, "expected_length": 4}),
         ("Ev 1", {"opcode": 209, "modrm": 16, "expected_length": 4}),
+        ("Ev 1", {"opcode": 209, "modrm": 16, "expected_length": 2}),
+        ("Ev CL", {"opcode": 211, "modrm": 16, "expected_length": 2}),
     ],
     "RCR8": [
         ("Eb 1", {"opcode": 208, "modrm": 24, "expected_length": 4}),
         ("Eb 1", {"opcode": 208, "modrm": 24, "expected_length": 4}),
+        ("Eb 1", {"opcode": 208, "modrm": 24, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 24, "expected_length": 2}),
+        ("Eb 1", {"opcode": 208, "modrm": 24, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 24, "expected_length": 2}),
     ],
     "RCR16": [
         ("Ev 1", {"opcode": 209, "modrm": 24, "expected_length": 4}),
         ("Ev 1", {"opcode": 209, "modrm": 24, "expected_length": 4}),
+        ("Ev 1", {"opcode": 209, "modrm": 24, "expected_length": 2}),
+        ("Ev CL", {"opcode": 211, "modrm": 24, "expected_length": 2}),
     ],
     "SHL8": [
         ("Eb 1", {"opcode": 208, "modrm": 32, "expected_length": 4}),
         ("Eb 1", {"opcode": 208, "modrm": 32, "expected_length": 4}),
+        ("Eb 1", {"opcode": 208, "modrm": 32, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 32, "expected_length": 2}),
+        ("Eb 1", {"opcode": 208, "modrm": 32, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 32, "expected_length": 2}),
     ],
     "SHL16": [
         ("Ev 1", {"opcode": 209, "modrm": 32, "expected_length": 4}),
         ("Ev 1", {"opcode": 209, "modrm": 32, "expected_length": 4}),
+        ("Ev 1", {"opcode": 209, "modrm": 32, "expected_length": 2}),
+        ("Ev CL", {"opcode": 211, "modrm": 32, "expected_length": 2}),
     ],
     "SHR8": [
         ("Eb 1", {"opcode": 208, "modrm": 40, "expected_length": 4}),
         ("Eb 1", {"opcode": 208, "modrm": 40, "expected_length": 4}),
+        ("Eb 1", {"opcode": 208, "modrm": 40, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 40, "expected_length": 2}),
+        ("Eb 1", {"opcode": 208, "modrm": 40, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 40, "expected_length": 2}),
     ],
     "SHR16": [
         ("Ev 1", {"opcode": 209, "modrm": 40, "expected_length": 4}),
         ("Ev 1", {"opcode": 209, "modrm": 40, "expected_length": 4}),
+        ("Ev 1", {"opcode": 209, "modrm": 40, "expected_length": 2}),
+        ("Ev CL", {"opcode": 211, "modrm": 40, "expected_length": 2}),
     ],
     "SAR8": [
         ("Eb 1", {"opcode": 208, "modrm": 56, "expected_length": 4}),
         ("Eb 1", {"opcode": 208, "modrm": 56, "expected_length": 4}),
+        ("Eb 1", {"opcode": 208, "modrm": 56, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 56, "expected_length": 2}),
+        ("Eb 1", {"opcode": 208, "modrm": 56, "expected_length": 2}),
+        ("Eb CL", {"opcode": 210, "modrm": 56, "expected_length": 2}),
     ],
     "SAR16": [
         ("Ev 1", {"opcode": 209, "modrm": 56, "expected_length": 4}),
         ("Ev 1", {"opcode": 209, "modrm": 56, "expected_length": 4}),
+        ("Ev 1", {"opcode": 209, "modrm": 56, "expected_length": 2}),
+        ("Ev CL", {"opcode": 211, "modrm": 56, "expected_length": 2}),
     ],
     "NOT8": [("Eb", {"opcode": 246, "modrm": 16, "expected_length": 5})],
     "NOT16": [("Ev", {"opcode": 247, "modrm": 16, "expected_length": 6})],
