@@ -107,7 +107,7 @@ class Emulator:
                 raise Exception(
                     f"There was an error while handling instruction {instr.operation}:", e)
 
-            self.set_register("IP", self.get_register("IP") + span)
+            self.set_register("IP", (self.get_register("IP") + span) % 2**16)
 
     def _complete_instruction_dictionary(self):
         for instr in SIMPLE_CONDITION_JMPS.keys():
@@ -671,7 +671,7 @@ class Emulator:
         IP_val = self.get_byte(
             "ABS", instruction.arguments[0].value * 4)
         IP_val -= 1  # Because IP in increased before loading instruction
-        self.set_register("IP",  IP_val)
+        self.set_register("IP",  (IP_val % 2**16))
 
     def INT21h(self, instruction):
         """Loads one byte from console."""
