@@ -52,10 +52,10 @@ class Emulator:
             "IDIV": self.IDIV, "IRET": self.IRET, "CBW": self.CBW,
             "RET": self.RET, "RETF": self.RETF, "INT": self.INT,
             "IRET": self.IRET, "CBW": self.CBW, "INTO": self.INTO,
-            "ROL": self.ROL, "ROR": self.ROR, "RCR": self.RCR, 
-            "RCL": self.RCL, "SHL": self.SHL, "SAR": self.SAR, 
+            "ROL": self.ROL, "ROR": self.ROR, "RCR": self.RCR,
+            "RCL": self.RCL, "SHL": self.SHL, "SAR": self.SAR,
             "SHR": self.SHR, "MUL": self.MUL, "IMUL": self.IMUL,
-            
+
             # Conditional jumps are added later in the code from a dictionary
         }
 
@@ -295,6 +295,13 @@ class Emulator:
 
     def MOV(self, instruction: Instruction):
         to_insert = self.get_value(instruction.arguments[1])
+
+        # Tohle je tak strašně napsané, ale bohužel není čas
+        if isinstance(instruction.arguments[1], Memmory) and instruction.size == 16:
+            src = instruction.arguments[1]
+            src.displacement += 1
+            to_insert += 2**8 * self.get_value(instruction.arguments[1])
+
         self.set_value(instruction.arguments[0], to_insert, instruction.size)
         # MOV Nenastavouje příznaky
 
@@ -660,7 +667,7 @@ class Emulator:
 
         self.set_register("CS", self.get_byte(
             "ABS", instruction.arguments[0].value * 4 + 2))
-        
+
         IP_val = self.get_byte(
             "ABS", instruction.arguments[0].value * 4)
         IP_val -= 1  # Because IP in increased before loading instruction
@@ -736,30 +743,34 @@ class Emulator:
         count = self.get_value(instruction.arguments[1])
 
         result = (val << count) + (val >> (instruction.size - count))
-        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+        self.set_value(
+            instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
-        
         self.update_flags(result, instruction.size, [CF])
         if count == 1:
-            self.set_flag(OF, self.get_flag(CF) != get_bit(result, instruction.size - 1))
+            self.set_flag(OF, self.get_flag(CF) != get_bit(
+                result, instruction.size - 1))
 
     def ROR(self, instruction):
         val = self.get_value(instruction.arguments[0])
         count = self.get_value(instruction.arguments[1])
 
         result = (val >> count) + (val << (instruction.size - count))
-        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+        self.set_value(
+            instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
         self.set_flag(CF, get_bit(val, 0))
         if count == 1:
-            self.set_flag(OF, get_bit(val, instruction.size - 1) != get_bit(result, instruction.size - 1))
+            self.set_flag(OF, get_bit(val, instruction.size - 1)
+                          != get_bit(result, instruction.size - 1))
 
     def RCR(self, instruction):
         val = self.get_value(instruction.arguments[0])
         count = self.get_value(instruction.arguments[1])
 
         result = (val >> count) + (val << (instruction.size - count))
-        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+        self.set_value(
+            instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
         self.set_flag(CF, get_bit(val, 0))
 
@@ -768,7 +779,8 @@ class Emulator:
         count = self.get_value(instruction.arguments[1])
 
         result = (val << count) + (val >> (instruction.size - count))
-        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+        self.set_value(
+            instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
         self.set_flag(CF, get_bit(val, instruction.size - 1))
 
@@ -777,32 +789,35 @@ class Emulator:
         count = self.get_value(instruction.arguments[1])
 
         result = val << count
-        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+        self.set_value(
+            instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
         self.set_flag(CF, get_bit(val, instruction.size - count))
-        self.set_flag(OF, self.get_flag(CF) != get_bit(result, instruction.size - 1))
-    
+        self.set_flag(OF, self.get_flag(CF) != get_bit(
+            result, instruction.size - 1))
+
     def SAR(self, instruction):
         val = self.get_value(instruction.arguments[0])
         count = self.get_value(instruction.arguments[1])
 
         result = val >> count
-        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+        self.set_value(
+            instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
         self.set_flag(CF, get_bit(val, count - 1))
         self.set_flag(OF, 0)
-    
+
     def SHR(self, instruction):
         val = self.get_value(instruction.arguments[0])
         count = self.get_value(instruction.arguments[1])
 
         result = val >> count
-        self.set_value(instruction.arguments[0], result % 2**instruction.size, instruction.size)
+        self.set_value(
+            instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
         self.set_flag(CF, get_bit(val, count - 1))
         if count == 1:
             self.set_flag(OF, get_bit(val, instruction.size - 1))
-
 
     # ------- ANOTHER INSTRUCTIONS: --------
 
@@ -818,7 +833,7 @@ class Emulator:
     def HLT(self, instruction):
         # Už jsme ji pro Vás naprogramovali ;-)
         self.running = False
-    
+
     def debug_print_line(self, address: int, instr: Instruction):
         possible_line = self.lines_info.get(address)
 
@@ -826,4 +841,5 @@ class Emulator:
             print(
                 f"Abs address: {address}, instr: {instr.operation} \tline {possible_line[0]}:{possible_line[1]}")
         elif instr.operation != "NOP":
-            print(f"Abs address: {address}, instr: {instr.operation} \tline (unknown)")
+            print(
+                f"Abs address: {address}, instr: {instr.operation} \tline (unknown)")
