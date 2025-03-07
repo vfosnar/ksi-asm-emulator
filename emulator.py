@@ -699,6 +699,7 @@ class Emulator:
             case 0x0A:  # Načíst řetězec
                 offset = self.get_register("DX")
                 max_len = self.get_byte("DS", offset)  # Length
+                self.set_flag(ZF, 0)
 
                 if self.console_input == "":
                     self.set_byte("DS", offset + 1, 0)
