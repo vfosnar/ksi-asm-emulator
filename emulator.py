@@ -766,24 +766,24 @@ class Emulator:
                           != get_bit(result, instruction.size - 1))
 
     def RCR(self, instruction):
-        val = self.get_value(instruction.arguments[0])
+        val = self.get_value(instruction.arguments[0]) + (self.get_flag(CF) << instruction.size)
         count = self.get_value(instruction.arguments[1])
 
-        result = (val >> count) + (val << (instruction.size - count))
+        result = (val >> count) + (val << (instruction.size - count + 1))
         self.set_value(
             instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
-        self.set_flag(CF, get_bit(val, 0))
+        self.set_flag(CF, get_bit(result, instruction.size))
 
     def RCL(self, instruction):
-        val = self.get_value(instruction.arguments[0])
+        val = self.get_value(instruction.arguments[0]) | (self.get_flag(CF) << instruction.size)
         count = self.get_value(instruction.arguments[1])
 
-        result = (val << count) + (val >> (instruction.size - count))
+        result = (val << count) + (val >> (instruction.size - count + 1))
         self.set_value(
             instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
-        self.set_flag(CF, get_bit(val, instruction.size - 1))
+        self.set_flag(CF, get_bit(result, instruction.size))
 
     def SHL(self, instruction):
         val = self.get_value(instruction.arguments[0])
