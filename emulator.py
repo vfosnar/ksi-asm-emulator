@@ -802,6 +802,8 @@ class Emulator:
         count = self.get_value(instruction.arguments[1])
 
         result = val >> count
+        if get_bit(val, instruction.size-1) == 1:
+            result |= ((1 << count) - 1) << (instruction.size - count)
         self.set_value(
             instruction.arguments[0], result % 2**instruction.size, instruction.size)
 
