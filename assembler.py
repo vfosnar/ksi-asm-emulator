@@ -153,9 +153,9 @@ def parse_line_parts(line: str) -> tuple[str, str, list[str]]:
 
     instr, line = split_on(line, " ")
 
+    instr = instr.upper()
     instr = INSTRUCTION_ALIASES.get(instr, instr)
 
-    instr = instr.upper()
     line, _ = split_on(line, ";")
 
     args = [l.strip() for l in line.split(",")]
