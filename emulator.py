@@ -429,14 +429,20 @@ class Emulator:
 
         divisor = self.get_value(instruction.arguments[0])
 
-        if divisor == 0:
+        result = 0
+        if divisor != 0:
+            result = val // divisor
+
+        is_out_of_range = not (0 <= result < 2**instruction.size)
+        if divisor == 0 or is_out_of_range:
+            if is_out_of_range: 
+                print("Výsledek dělení nespadá do rozsahu zobrazení.")
             instr = Instruction()
             instr.operation = "INT"
             instr.arguments = [Immutable(0)]
             self.INT(instr)
             return
 
-        result = val // divisor
         remainder = val % divisor
 
         if instruction.size == 8:
@@ -455,15 +461,21 @@ class Emulator:
                 "DX") * 2**16 + self.get_register("AX"), 16)
 
         divisor = from_twos_complement(self.get_value(instruction.arguments[0]), instruction.size)
+        
+        result = 0
+        if divisor != 0:
+            result = to_twos_complement(val // divisor, instruction.size)
 
-        if divisor == 0:
+        is_out_of_range = not (0 <= result < 2**instruction.size)
+        if divisor == 0 or is_out_of_range:
+            if is_out_of_range: 
+                print("Výsledek dělení nespadá do rozsahu zobrazení.")
             instr = Instruction()
             instr.operation = "INT"
             instr.arguments = [Immutable(0)]
             self.INT(instr)
             return
-
-        result = to_twos_complement(val // divisor, instruction.size)
+        
         remainder = abs(val % divisor)
 
         if instruction.size == 8:
