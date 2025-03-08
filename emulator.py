@@ -477,6 +477,8 @@ class Emulator:
             return
         
         remainder = abs(val % divisor)
+        if val < 0:
+            remainder = to_twos_complement(-remainder, instruction.size)
 
         if instruction.size == 8:
             self.set_value(Register("AL"), result, 8)
