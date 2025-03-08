@@ -454,7 +454,7 @@ class Emulator:
             val = from_twos_complement(self.get_register(
                 "DX") * 2**16 + self.get_register("AX"), 16)
 
-        divisor = self.get_value(instruction.arguments[0])
+        divisor = from_twos_complement(self.get_value(instruction.arguments[0]), instruction.size)
 
         if divisor == 0:
             instr = Instruction()
@@ -463,10 +463,8 @@ class Emulator:
             self.INT(instr)
             return
 
-        result = from_twos_complement(val, instruction.size) // \
-            from_twos_complement(divisor, instruction.size)
-        remainder = from_twos_complement(val, instruction.size) % \
-            from_twos_complement(divisor, instruction.size)
+        result = to_twos_complement(val // divisor, instruction.size)
+        remainder = abs(val % divisor)
 
         if instruction.size == 8:
             self.set_value(Register("AL"), result, 8)
