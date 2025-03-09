@@ -109,7 +109,7 @@ def parse_next_instruction(program, address) -> tuple['Instruction', int]:
                 raise NotImplementedError(
                     "Not relevant for KSI emulator.")  # TODO: better hláška
             case _:
-                raise Exception("Unrecognised instruction property")
+                raise AssertionError("Unrecognised instruction property")
 
     return instruction, span
 

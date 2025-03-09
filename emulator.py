@@ -71,7 +71,7 @@ class Emulator:
     def run(self):
         while self.running:
             if self.instructions_counter > self.max_instructions:
-                raise Exception(
+                raise AssertionError(
                     f"Your program executed more than {self.instructions_counter - 1} instructions. There may be an infinite loop.")
             self.instructions_counter += 1
 
@@ -80,7 +80,7 @@ class Emulator:
             try:
                 instr, span = parse_next_instruction(self.program, address)
             except Exception as e:
-                raise Exception(
+                raise AssertionError(
                     f"Error while parsing instruction at address: {address}. Perhaps you've forgotten HLT or you're jumping to wrong address.")
 
             self.statistics[instr.operation] = self.statistics.get(
@@ -90,7 +90,7 @@ class Emulator:
                 self.debug_print_line(address, instr)
 
             if instr.operation not in self.instr_methods:
-                raise Exception(
+                raise AssertionError(
                     f"This emulator doesn't support this operation: {instr.operation}")
 
             try:
@@ -104,7 +104,7 @@ class Emulator:
                 else:
                     print("This error didn't happen handling any of your lines.")
 
-                raise Exception(
+                raise AssertionError(
                     f"There was an error while handling instruction {instr.operation}:", e)
 
             self.set_register("IP", (self.get_register("IP") + span) % 2**16)

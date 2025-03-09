@@ -88,7 +88,7 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
         else:
             size = get_instruction_size(instr, args)
             if instr+str(size) not in INSTRUCTIONS_v2:
-                raise Exception(f"Unknown instruction {instr}")
+                raise AssertionError(f"Unknown instruction {instr}")
             possible_codes = INSTRUCTIONS_v2[instr+str(size)]
             for instr_params, info in possible_codes:
                 if matches_args(instr_params.split(" "), args):
@@ -97,7 +97,7 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
                     segments_templates[-1].append((instr_params, args, info))
                     break
             else:
-                raise Exception(f"Invalid arguments for instruction {instr}")
+                raise AssertionError(f"Invalid arguments for instruction {instr}")
 
         if has_prefix:
             info["expected_length"] += 1
@@ -115,7 +115,7 @@ def assemble(code: str) -> tuple[list[int], tuple[int, int], dict[int, tuple[int
 
             if len(bytes) != info["expected_length"]:
                 # 844 - random number, kdybych někde jinde přidával stejnou message
-                raise Exception(
+                raise AssertionError(
                     f"Chyba emulátoru. Prosím napiš na Diskusní fórum úlohy. (ErrCode: 844 - neočekávaný počet bajtů)")
 
             segment_bytecode.extend(bytes)
@@ -234,10 +234,10 @@ def get_instruction_size(instruction: str, args: list[str]) -> int:
             size = figured
 
         if figured is not None and size != figured:
-            raise Exception("Incompatible sizes of arguments")
+            raise AssertionError("Incompatible sizes of arguments")
 
     if size is None:
-        raise Exception("No size specified")
+        raise AssertionError("No size specified")
 
     return size
 
@@ -327,7 +327,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
             if prefix in arg:
                 args[i] = arg.replace(prefix, "")
                 if prefix in info and info[prefix] is not None:
-                    raise Exception("Can't have two prefixes or sth - problem")
+                    raise AssertionError("Can't have two prefixes")
                 info["prefix"] = PREFIX_CODES[prefix]
 
     # Parse args
@@ -354,7 +354,7 @@ def convert_to_bytes(args: list[str], parameters: str, info: Info,
                     arg = arg.replace("FAR ", "")
                     if arg not in labels:
                         if "+" in arg:
-                            raise Exception(
+                            raise AssertionError(
                                 f"Při FAR JMP/CALL prosím nepoužívejte matematiku. (kdyby něco, pište na DF)")
 
                     info["data"].extend(int_to_bytes(labels[arg], 16))
