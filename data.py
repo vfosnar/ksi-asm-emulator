@@ -182,8 +182,10 @@ INSTRUCTION_ALIASES = {
     "JNLE": "JG",
     "JNA": "JBE",
     "JNG": "JLE",
-    "JNB": "JAE",
+    "JAE": "JNB",
     "JNL": "JGE",
+    "JC": "JB",
+    "JNC": "JAE",
 
     "SAL": "SHL",
 }
