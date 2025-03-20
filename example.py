@@ -3,40 +3,54 @@ from emulator import Emulator
 
 # Dá se i načíst ze souboru (.asm)
 code = """
-segment	code
-..start	mov bx,data
-		mov ds,bx
-		mov bx,stack
-		mov ss,bx
-		mov sp,dno
-		
-loop_s	mov AH, 0Ah	; Přečíst řádek
-		mov DX,nacteno
-		int 21h	
-		
-		JNZ cont
-		JMP FAR konec
+segment code
+..start
+        MOV AX, stack
+        MOV SS, AX
+        MOV SP, top
+
+        POP AX          ; F_1
+        POP BX          ; F_0
+        POP DX          ; n
+
+        PUSH BX         ; vratim F_0
+        CMP DX, 1
+        JL end          ; pokud je n = 0, program skonci
+
+        PUSH AX         ; vratim F_1
+
+        CMP DX, 2
+        JL end
+
+loop:
+        CALL func
+        DEC DX
+        CMP DX, 2
+        JL end
+        JNC loop
+
+func:
+        POP AX         ; F_n-1
+        POP BX         ; F_n-2
         
-cont 	MOV BX, [nacteno+1]	; delka
-	 	MOV byte [BX+2],  0
-	 
-		mov AH,9	; Vypsat řetězec bajtů na terminál
-		mov DX,radek
-		int 21h	
+        PUSH AX        ; F_n-1
+        ADD AX, BX     ; F_n
+        POP CX         ; vratim si F_n-1
+        PUSH BX        ; vratim F_n-2
+        PUSH CX        ; vratim f_n-1
+        PUSH AX        ; ulozim F_n
+        RET
 
-        JMP FAR loop_s
-	
-konec 	HLT
-    
-segment	data
-nacteno	db 80, ?
-radek	resb 80
+end:
+        HLT
+
+segment stack
+        resb 65530
+top:    dw 1  ; F_1
+        dw 0  ; F_0
+        dw 3  ; n
 
 
-segment	stack
-		resb 256
-dno		db 0
-        
 """
 
 
@@ -58,3 +72,5 @@ e.run()
 print(e.registers)
 print("Console output:", e.console_output.replace("\n", "\\n"))
 print(e.statistics)
+
+print(e.program)
