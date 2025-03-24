@@ -4,8 +4,7 @@ import sys
 from assembler import assemble
 from emulator import Emulator
 
-file_path = sys.argv[1]
-with open(file_path, "r") as file:
+with open("data/program.asm", "r") as file:
     code = file.read()
 
 # Převést na bajtkód
@@ -15,7 +14,8 @@ program, start, lines_info = assemble(code)
 e = Emulator(program, start, lines_info)
 
 # [volitelné] Nastavit vstup konzole, upravit maximální počet instrukcí, vypnutí debug módu (vypisování jednotlivých kroků)
-e.console_input = "Hello\nWorld\n"
+with open("data/vstup.txt") as file:
+    e.console_input = file.read()
 e.max_instructions = 100_000
 # e.debugging_mode = False
 
