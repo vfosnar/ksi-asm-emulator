@@ -1,11 +1,6 @@
 
-Ahoj, díky že jsi mě otevřel.
+Emulátor k úloze https://ksi.fi.muni.cz/ulohy/753
 
-Hotový parciální disassembler a náznak assembleru je v souboru disassembler.py. V emulátor pak najdete -nečekaně- v souboru emulator_01.py.
+Soubory s koncovkou `.asm` jsou gitem ignorovány. Můžete spustit libovolný assembly soubor zavoláním `./run.py <nazev souboru>`.
 
-Budu rád za jakoukoli pomoc nebo zpětnou vazbu.
-
-Varování: kód není čitelný
-
-PS: Pokud nejsi ORG této soutěže, prosím odejdi ;-)
-
+Logika emulátoru zůstává nedotčena, tento repozitář existuje pouze protože nerad bojuju s Pythonem na Nixu.
